@@ -76,4 +76,41 @@ final class BasicTests: XCTestCase {
             }
         }
     }
+    
+    func testQuickStartExample() throws {
+        // Test the exact Quick Start example from README
+        let lua = try LuaState()
+        
+        // Execute Lua code
+        try lua.execute("print('Hello from Lua!')")
+        
+        // Get values from Lua
+        let result = try lua.executeReturning("return 2 + 2", as: Int.self)
+        XCTAssertEqual(result, 4)
+    }
+    
+    func testErrorHandlingDocumentationPattern() throws {
+        // Test the exact error handling pattern shown in README
+        let lua = try LuaState()
+        
+        do {
+            try lua.execute("invalid lua code")
+            XCTFail("Should have thrown syntax error")
+        } catch LuaError.syntax(let message) {
+            // Success - we caught the syntax error as documented
+            XCTAssertFalse(message.isEmpty)
+        } catch {
+            XCTFail("Expected LuaError.syntax, got \(error)")
+        }
+        
+        do {
+            try lua.execute("error('test runtime error')")
+            XCTFail("Should have thrown runtime error")
+        } catch LuaError.runtime(let message) {
+            // Success - we caught the runtime error as documented
+            XCTAssertTrue(message.contains("test runtime error"))
+        } catch {
+            XCTFail("Expected LuaError.runtime, got \(error)")
+        }
+    }
 }
