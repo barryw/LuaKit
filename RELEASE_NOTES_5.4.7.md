@@ -96,6 +96,10 @@ These limitations are documented in the README and will be addressed as Swift's 
 
 Version 5.4.7 matches the underlying Lua version for clarity.
 
+## 📄 License
+
+Released under the MIT License.
+
 ## 🙏 Acknowledgments
 
 Built on [CLua](https://github.com/barryw/CLua) for Lua C bindings.

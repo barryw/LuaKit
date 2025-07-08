@@ -341,4 +341,4 @@ These limitations will be addressed as Swift's macro system matures. For now, th
 
 ## License
 
-[Your License Here]
+MIT License - see [LICENSE](LICENSE) file for details.
