@@ -48,11 +48,20 @@ print("Result: \(result)") // Result: 4
 
 ## Bridging Swift Classes to Lua
 
-Use the `@LuaBridgeable` macro to expose Swift classes to Lua:
+### Using the @LuaBridgeable Macro (Recommended)
+
+**Important**: Due to current Swift macro limitations, you must:
+1. Import `CLua` in your file
+2. Manually add the `: LuaBridgeable` conformance
+3. The macro will then generate the required methods
 
 ```swift
+import Foundation
+import CLua  // Required for generated code
+import LuaKit
+
 @LuaBridgeable
-public class Image {
+public class Image: LuaBridgeable {  // Must explicitly conform
     public var width: Int
     public var height: Int
     
@@ -65,6 +74,10 @@ public class Image {
         self.width = width
         self.height = height
     }
+    
+    public var description: String {
+        return "Image(\(width)x\(height))"
+    }
 }
 
 // Register the class with Lua
@@ -76,6 +89,28 @@ try lua.execute("""
     print("Size:", img.width, "x", img.height)
     img:resize(800, 600)
 """)
+```
+
+### Manual Implementation (Alternative)
+
+If you prefer not to use macros or need more control, you can implement the protocol manually:
+
+```swift
+public class Image: LuaBridgeable {
+    // ... properties and methods ...
+    
+    static func registerMethods(_ L: OpaquePointer) {
+        // Implementation details
+    }
+    
+    static func registerConstructor(_ L: OpaquePointer, name: String) {
+        // Implementation details
+    }
+    
+    static func luaNew(_ L: OpaquePointer) -> Int32 {
+        // Implementation details
+    }
+}
 ```
 
 ## Working with Globals
@@ -170,6 +205,16 @@ do {
     print("Other error: \(error)")
 }
 ```
+
+## Macro Limitations
+
+The `@LuaBridgeable` macro has some limitations due to Swift's evolving macro system:
+
+1. **Manual Imports Required**: You must import `CLua` in files using the macro
+2. **Explicit Conformance**: You must manually add `: LuaBridgeable` to your class
+3. **Generated Code Context**: The macro generates code that expects certain functions to be in scope
+
+These limitations will be addressed as Swift's macro system matures. For now, the macro still provides significant value by eliminating boilerplate code.
 
 ## Requirements
 

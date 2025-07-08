@@ -21,14 +21,22 @@ let package = Package(
     dependencies: [
         // Dependencies declare other packages that this package depends on.
         .package(url: "https://github.com/barryw/CLua", from: "5.4.7"),
+        .package(url: "https://github.com/apple/swift-syntax.git", from: "509.0.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
+        .macro(
+            name: "LuaMacros",
+            dependencies: [
+                .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
+                .product(name: "SwiftCompilerPlugin", package: "swift-syntax")
+            ]),
         .target(
             name: "LuaKit",
             dependencies: [
-                "CLua"
+                "CLua",
+                "LuaMacros"
             ]),
         .testTarget(
             name: "LuaKitTests",

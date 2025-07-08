@@ -7,9 +7,13 @@
 //
 
 import Foundation
+import CLua  // Required for @LuaBridgeable macro
+import LuaKit
 
+// Example using the @LuaBridgeable macro
+// Note: Must explicitly conform to LuaBridgeable due to current macro limitations
 @LuaBridgeable
-public class Image: CustomStringConvertible {
+public class Image: LuaBridgeable, CustomStringConvertible {
     public var width: Int
     public var height: Int
     
