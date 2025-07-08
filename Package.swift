@@ -20,12 +20,19 @@ let package = Package(
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
-        .package(url: "https://github.com/barryw/CLua", from: "5.4.7"),
         .package(url: "https://github.com/apple/swift-syntax.git", from: "509.0.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
+        .target(
+            name: "Lua",
+            dependencies: [],
+            cSettings: [
+                .define("LUA_USE_MACOSX", .when(platforms: [.macOS])),
+                .define("LUA_USE_IOS", .when(platforms: [.iOS, .tvOS, .watchOS]))
+            ]
+        ),
         .macro(
             name: "LuaMacros",
             dependencies: [
@@ -35,7 +42,7 @@ let package = Package(
         .target(
             name: "LuaKit",
             dependencies: [
-                "CLua",
+                "Lua",
                 "LuaMacros"
             ]),
         .testTarget(

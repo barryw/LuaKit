@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import CLua  // Required for the generated code
+import Lua  // Required for the generated code
 import LuaKit
 
 // MARK: - Example 1: Basic Usage with @LuaBridgeable

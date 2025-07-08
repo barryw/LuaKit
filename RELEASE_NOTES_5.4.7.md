@@ -30,7 +30,7 @@ dependencies: [
 ## 🚀 Quick Start
 
 ```swift
-import CLua  // Required for @LuaBridgeable
+import Lua  // Required for @LuaBridgeable
 import LuaKit
 
 @LuaBridgeable
@@ -63,7 +63,7 @@ try lua.execute("""
 ## 📝 Macro Limitations
 
 Due to current Swift macro limitations:
-1. Must import `CLua` in files using `@LuaBridgeable`
+1. Must import `Lua` in files using `@LuaBridgeable`
 2. Must explicitly add `: LuaBridgeable` conformance
 3. Generated code expects certain functions in scope
 
@@ -102,4 +102,4 @@ Released under the MIT License.
 
 ## 🙏 Acknowledgments
 
-Built on [CLua](https://github.com/barryw/CLua) for Lua C bindings.
+LuaKit embeds Lua 5.4.7 directly, providing a self-contained solution with no external dependencies.

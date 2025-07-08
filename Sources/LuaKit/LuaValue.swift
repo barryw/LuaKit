@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import CLua
+import Lua
 
 public enum LuaValue: Equatable, Hashable {
     case `nil`

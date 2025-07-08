@@ -7,7 +7,7 @@
 //
 
 import Foundation
-import CLua
+import Lua
 import LuaKit
 
 // Example of manually implementing LuaBridgeable without using the macro
@@ -188,12 +188,12 @@ public func demonstrateManualBridging() throws {
  - Full control over implementation
  - More verbose (~100 lines of boilerplate)
  - Useful for complex bridging scenarios
- - No additional imports required beyond CLua
+ - No additional imports required beyond Lua
  
  @LuaBridgeable Macro:
  - Generates all the above code automatically
  - Much more concise
- - Requires: import CLua and explicit : LuaBridgeable
+ - Requires: import Lua and explicit : LuaBridgeable
  - Supports @LuaIgnore and @LuaOnly attributes
  - Handles most common cases
  

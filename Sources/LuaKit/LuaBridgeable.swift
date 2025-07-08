@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import CLua
+import Lua
 
 public protocol LuaBridgeable: AnyObject {
     static var metaTableName: String { get }

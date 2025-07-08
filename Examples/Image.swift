@@ -7,7 +7,7 @@
 //
 
 import Foundation
-import CLua  // Required for @LuaBridgeable macro
+import Lua  // Required for @LuaBridgeable macro
 import LuaKit
 
 // Example using the @LuaBridgeable macro

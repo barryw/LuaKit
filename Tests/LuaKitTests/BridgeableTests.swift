@@ -6,7 +6,7 @@
 //
 
 import XCTest
-import CLua
+import Lua
 @testable import LuaKit
 
 // Test class that will be bridged to Lua

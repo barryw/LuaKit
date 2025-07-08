@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import CLua
+import Lua
 
 public final class LuaState {
     private let L: OpaquePointer

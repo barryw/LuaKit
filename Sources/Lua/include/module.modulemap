@@ -1,0 +1,6 @@
+module Lua {
+    header "lua.h"
+    header "lualib.h"
+    header "lauxlib.h"
+    export *
+}

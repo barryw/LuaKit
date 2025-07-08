@@ -1,6 +1,6 @@
 # LuaKit
 
-A Swift framework for embedding Lua scripting into iOS and macOS applications with seamless Swift-Lua bridging.
+A Swift framework for embedding Lua scripting into iOS and macOS applications with seamless Swift-Lua bridging. LuaKit includes Lua 5.4.7 embedded directly, requiring no external dependencies.
 
 ## Features
 
@@ -51,13 +51,13 @@ print("Result: \(result)") // Result: 4
 ### Using the @LuaBridgeable Macro (Recommended)
 
 **Important**: Due to current Swift macro limitations, you must:
-1. Import `CLua` in your file
+1. Import `Lua` in your file
 2. Manually add the `: LuaBridgeable` conformance
 3. The macro will then generate the required methods
 
 ```swift
 import Foundation
-import CLua  // Required for generated code
+import Lua  // Required for generated code
 import LuaKit
 
 @LuaBridgeable
@@ -327,7 +327,7 @@ do {
 
 The `@LuaBridgeable` macro has some limitations due to Swift's evolving macro system:
 
-1. **Manual Imports Required**: You must import `CLua` in files using the macro
+1. **Manual Imports Required**: You must import `Lua` in files using the macro
 2. **Explicit Conformance**: You must manually add `: LuaBridgeable` to your class
 3. **Generated Code Context**: The macro generates code that expects certain functions to be in scope
 

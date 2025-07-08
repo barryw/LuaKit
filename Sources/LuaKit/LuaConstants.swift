@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import CLua
+import Lua
 
 // Lua constants that are defined as macros and not available in Swift
 public let LUA_REGISTRYINDEX: Int32 = -1001000  // -LUAI_MAXSTACK - 1000, where LUAI_MAXSTACK = 1000000

@@ -6,7 +6,7 @@
 //
 
 import XCTest
-import CLua  // Required for @LuaBridgeable macro
+import Lua  // Required for @LuaBridgeable macro
 @testable import LuaKit
 
 // Test class using the @LuaBridgeable macro
