@@ -80,6 +80,9 @@ public class Image: LuaBridgeable {  // Must explicitly conform
     }
 }
 
+// Create a Lua state
+let lua = try LuaState()
+
 // Register the class with Lua
 lua.register(Image.self, as: "Image")
 
