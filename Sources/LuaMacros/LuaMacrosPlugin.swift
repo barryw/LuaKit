@@ -336,9 +336,10 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
             }
             
             codeLines.append("    default:")
-            codeLines.append("        lua_getfield(L, LUA_REGISTRYINDEX, \(className).metaTableName)")
+            codeLines.append("        // Check metatable for methods")
+            codeLines.append("        lua_getmetatable(L, 1)")
             codeLines.append("        lua_pushstring(L, key)")
-            codeLines.append("        lua_gettable(L, -2)")
+            codeLines.append("        lua_rawget(L, -2)")
             codeLines.append("        return 1")
             codeLines.append("    }")
             codeLines.append("}, 0)")

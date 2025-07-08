@@ -166,14 +166,16 @@ public class BankAccount {
     public var balance: Double       // ✅ Bridged
     
     @LuaIgnore
-    public var accountNumber: String // ❌ Not bridged
+    public var accountNumber: String // ❌ Not bridged (returns nil in Lua)
     
     public func deposit(_ amount: Double) { }  // ✅ Bridged
     
     @LuaIgnore
-    public func deleteAccount() { }  // ❌ Not bridged
+    public func deleteAccount() { }  // ❌ Not bridged (error if called)
 }
 ```
+
+**Note**: In Lua, accessing an ignored property returns `nil` (standard Lua behavior for non-existent properties), while calling an ignored method throws an error.
 
 ### Explicit Mode
 Only members marked with `@LuaOnly` are bridged:
