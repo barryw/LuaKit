@@ -8,6 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		4C45CB5B2E1D33FE0055FC41 /* LuaKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C45CB4F2E1D33FE0055FC41 /* LuaKit.framework */; };
+		4C45CB6B2E1D349F0055FC41 /* CLua in Frameworks */ = {isa = PBXBuildFile; productRef = 4C45CB6A2E1D349F0055FC41 /* CLua */; };
+		4C45CBA42E1D370D0055FC41 /* SwiftCompilerPlugin in Frameworks */ = {isa = PBXBuildFile; productRef = 4C45CBA32E1D370D0055FC41 /* SwiftCompilerPlugin */; };
+		4C45CBA62E1D370D0055FC41 /* SwiftSyntaxMacros in Frameworks */ = {isa = PBXBuildFile; productRef = 4C45CBA52E1D370D0055FC41 /* SwiftSyntaxMacros */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -26,14 +29,14 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		4C45CB512E1D33FE0055FC41 /* LuaKit */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = LuaKit;
-			sourceTree = "<group>";
-		};
 		4C45CB5E2E1D33FE0055FC41 /* LuaKitTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = LuaKitTests;
+			sourceTree = "<group>";
+		};
+		4C45CBDB2E1D3A430055FC41 /* LuaKit */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = LuaKit;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -43,6 +46,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4C45CBA62E1D370D0055FC41 /* SwiftSyntaxMacros in Frameworks */,
+				4C45CBA42E1D370D0055FC41 /* SwiftCompilerPlugin in Frameworks */,
+				4C45CB6B2E1D349F0055FC41 /* CLua in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -60,7 +66,7 @@
 		4C45CB452E1D33FE0055FC41 = {
 			isa = PBXGroup;
 			children = (
-				4C45CB512E1D33FE0055FC41 /* LuaKit */,
+				4C45CBDB2E1D3A430055FC41 /* LuaKit */,
 				4C45CB5E2E1D33FE0055FC41 /* LuaKitTests */,
 				4C45CB502E1D33FE0055FC41 /* Products */,
 			);
@@ -102,10 +108,13 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				4C45CB512E1D33FE0055FC41 /* LuaKit */,
+				4C45CBDB2E1D3A430055FC41 /* LuaKit */,
 			);
 			name = LuaKit;
 			packageProductDependencies = (
+				4C45CB6A2E1D349F0055FC41 /* CLua */,
+				4C45CBA32E1D370D0055FC41 /* SwiftCompilerPlugin */,
+				4C45CBA52E1D370D0055FC41 /* SwiftSyntaxMacros */,
 			);
 			productName = LuaKit;
 			productReference = 4C45CB4F2E1D33FE0055FC41 /* LuaKit.framework */;
@@ -161,6 +170,10 @@
 			);
 			mainGroup = 4C45CB452E1D33FE0055FC41;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				4C45CB692E1D349F0055FC41 /* XCRemoteSwiftPackageReference "CLua" */,
+				4C45CBA22E1D370D0055FC41 /* XCRemoteSwiftPackageReference "swift-syntax" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4C45CB502E1D33FE0055FC41 /* Products */;
 			projectDirPath = "";
@@ -468,6 +481,43 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		4C45CB692E1D349F0055FC41 /* XCRemoteSwiftPackageReference "CLua" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/barryw/CLua";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.4.7;
+			};
+		};
+		4C45CBA22E1D370D0055FC41 /* XCRemoteSwiftPackageReference "swift-syntax" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-syntax.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 601.0.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4C45CB6A2E1D349F0055FC41 /* CLua */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4C45CB692E1D349F0055FC41 /* XCRemoteSwiftPackageReference "CLua" */;
+			productName = CLua;
+		};
+		4C45CBA32E1D370D0055FC41 /* SwiftCompilerPlugin */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4C45CBA22E1D370D0055FC41 /* XCRemoteSwiftPackageReference "swift-syntax" */;
+			productName = SwiftCompilerPlugin;
+		};
+		4C45CBA52E1D370D0055FC41 /* SwiftSyntaxMacros */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4C45CBA22E1D370D0055FC41 /* XCRemoteSwiftPackageReference "swift-syntax" */;
+			productName = SwiftSyntaxMacros;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 4C45CB462E1D33FE0055FC41 /* Project object */;
 }
