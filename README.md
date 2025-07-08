@@ -96,25 +96,137 @@ try lua.execute("""
 
 ### Manual Implementation (Alternative)
 
-If you prefer not to use macros or need more control, you can implement the protocol manually:
+If you prefer not to use macros or need more control, you can implement the protocol manually. Here's what the macro generates for the Image class above:
 
 ```swift
 public class Image: LuaBridgeable {
-    // ... properties and methods ...
+    public var width: Int
+    public var height: Int
     
-    static func registerMethods(_ L: OpaquePointer) {
-        // Implementation details
+    public init(width: Int, height: Int) {
+        self.width = width
+        self.height = height
     }
     
-    static func registerConstructor(_ L: OpaquePointer, name: String) {
-        // Implementation details
+    public func resize(width: Int, height: Int) {
+        self.width = width
+        self.height = height
     }
     
-    static func luaNew(_ L: OpaquePointer) -> Int32 {
-        // Implementation details
+    public var description: String {
+        return "Image(\(width)x\(height))"
+    }
+    
+    // MARK: - LuaBridgeable Protocol Implementation
+    
+    public static func luaNew(_ L: OpaquePointer) -> Int32 {
+        let width = Int(luaL_checkinteger(L, 1))
+        let height = Int(luaL_checkinteger(L, 2))
+        
+        let instance = Image(width: width, height: height)
+        push(instance, to: L)
+        
+        return 1
+    }
+    
+    public static func registerConstructor(_ L: OpaquePointer, name: String) {
+        lua_createtable(L, 0, 1)
+        
+        lua_pushstring(L, "new")
+        lua_pushcclosure(L, { L in
+            guard let L = L else { return 0 }
+            return Image.luaNew(L!)
+        }, 0)
+        lua_settable(L, -3)
+        
+        lua_setglobal(L, name)
+    }
+    
+    public static func registerMethods(_ L: OpaquePointer) {
+        // Register resize method
+        lua_pushstring(L, "resize")
+        lua_pushcclosure(L, { L in
+            guard let L = L else { return 0 }
+            guard let obj = Image.checkUserdata(L!, at: 1) else {
+                return luaError(L!, "Invalid Image object")
+            }
+            
+            let width = Int(luaL_checkinteger(L!, 2))
+            let height = Int(luaL_checkinteger(L!, 3))
+            obj.resize(width: width, height: height)
+            return 0
+        }, 0)
+        lua_settable(L, -3)
+        
+        // Register __index for property access
+        lua_pushstring(L, "__index")
+        lua_pushcclosure(L, { L in
+            guard let L = L else { return 0 }
+            guard let obj = Image.checkUserdata(L!, at: 1) else {
+                return luaError(L!, "Invalid Image object")
+            }
+            
+            guard let key = String.pull(from: L!, at: 2) else {
+                return 0
+            }
+            
+            switch key {
+            case "width":
+                lua_pushinteger(L!, lua_Integer(obj.width))
+                return 1
+            case "height":
+                lua_pushinteger(L!, lua_Integer(obj.height))
+                return 1
+            default:
+                // Check metatable for methods
+                lua_getmetatable(L!, 1)
+                lua_pushstring(L!, key)
+                lua_rawget(L!, -2)
+                return 1
+            }
+        }, 0)
+        lua_settable(L, -3)
+        
+        // Register __newindex for property setting
+        lua_pushstring(L, "__newindex")
+        lua_pushcclosure(L, { L in
+            guard let L = L else { return 0 }
+            guard let obj = Image.checkUserdata(L!, at: 1) else {
+                return luaError(L!, "Invalid Image object")
+            }
+            
+            guard let key = String.pull(from: L!, at: 2) else {
+                return 0
+            }
+            
+            switch key {
+            case "width":
+                obj.width = Int(luaL_checkinteger(L!, 3))
+            case "height":
+                obj.height = Int(luaL_checkinteger(L!, 3))
+            default:
+                return luaError(L!, "Cannot set property \(key)")
+            }
+            return 0
+        }, 0)
+        lua_settable(L, -3)
+        
+        // Register __tostring
+        lua_pushstring(L, "__tostring")
+        lua_pushcclosure(L, { L in
+            guard let L = L else { return 0 }
+            guard let obj = Image.checkUserdata(L!, at: 1) else {
+                return luaError(L!, "Invalid Image object")
+            }
+            lua_pushstring(L!, obj.description)
+            return 1
+        }, 0)
+        lua_settable(L, -3)
     }
 }
 ```
+
+As you can see, the @LuaBridgeable macro saves you from writing ~100 lines of boilerplate code!
 
 ## Working with Globals
 
