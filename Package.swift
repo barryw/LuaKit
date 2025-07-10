@@ -48,5 +48,8 @@ let package = Package(
         .testTarget(
             name: "LuaKitTests",
             dependencies: ["LuaKit"]),
+        .testTarget(
+            name: "LuaKitPublicAPITests",
+            dependencies: ["LuaKit"]),
     ]
 )

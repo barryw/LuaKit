@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1+lua5.4.8] - 2025-07-10
+
+### Fixed
+- Fixed array proxy initializer access level that prevented consumers from using array element access
+- Array element access now works correctly when using LuaKit as an external dependency
+
+### Added
+- Public API test target to ensure public APIs are accessible to consumers
+- Tests that verify array element access works without @testable import
+
 ## [1.1.0+lua5.4.8] - 2025-07-10
 
 ### Added

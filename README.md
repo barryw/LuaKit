@@ -22,7 +22,7 @@ Add LuaKit to your `Package.swift` file:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/barryw/LuaKit", from: "1.1.0")
+    .package(url: "https://github.com/barryw/LuaKit", from: "1.1.1")
 ]
 ```
 

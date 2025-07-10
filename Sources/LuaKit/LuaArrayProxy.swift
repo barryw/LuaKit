@@ -16,11 +16,11 @@ public class LuaArrayProxy<Element: LuaConvertible> {
     private let setter: ([Element]) -> Void
     private let validator: (([Element]) -> Result<Void, PropertyValidationError>)?
     
-    init(owner: AnyObject,
-         propertyName: String,
-         getter: @escaping () -> [Element],
-         setter: @escaping ([Element]) -> Void,
-         validator: (([Element]) -> Result<Void, PropertyValidationError>)? = nil) {
+    public init(owner: AnyObject,
+                propertyName: String,
+                getter: @escaping () -> [Element],
+                setter: @escaping ([Element]) -> Void,
+                validator: (([Element]) -> Result<Void, PropertyValidationError>)? = nil) {
         self.owner = owner
         self.propertyName = propertyName
         self.getter = getter
