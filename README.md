@@ -7,6 +7,7 @@ A Swift framework for embedding Lua scripting into iOS and macOS applications wi
 - **Easy Lua Integration**: Simple API to create and manage Lua states
 - **Swift-Lua Bridging**: Expose Swift classes and methods to Lua with minimal boilerplate
 - **Type Safety**: Automatic type conversion between Swift and Lua types
+- **Array Support**: Seamless bridging of Swift arrays (`[String]`, `[Int]`, `[Double]`, `[Bool]`)
 - **Macro Support**: Use `@LuaBridgeable` macro to automatically generate bridging code
 - **Property Change Notifications**: Track and validate property changes from Lua
 - **Global Variables**: Easy access to Lua globals with Swift subscript syntax
@@ -21,7 +22,7 @@ Add LuaKit to your `Package.swift` file:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/barryw/LuaKit", from: "5.4.8")
+    .package(url: "https://github.com/barryw/LuaKit", from: "1.0.0")
 ]
 ```
 
@@ -264,6 +265,54 @@ try lua.execute("""
     print(person.age)     -- 30
     print(person[1])      -- first
 """)
+```
+
+## Working with Arrays
+
+LuaKit provides seamless array bridging between Swift and Lua for all primitive types:
+
+```swift
+@LuaBridgeable
+class ServerConfig: LuaBridgeable {
+    public var hosts: [String] = []
+    public var ports: [Int] = []
+    public var weights: [Double] = []
+    public var enabled: [Bool] = []
+    
+    public init() {}
+    
+    public var description: String {
+        return "ServerConfig(hosts: \(hosts.count), ports: \(ports.count))"
+    }
+}
+
+// Register and use
+let config = ServerConfig()
+lua.register(ServerConfig.self, as: "ServerConfig")
+lua.globals["config"] = config
+
+// Set arrays from Lua
+try lua.execute("""
+    config.hosts = {"api1.example.com", "api2.example.com", "api3.example.com"}
+    config.ports = {443, 443, 8443}
+    config.weights = {0.5, 0.3, 0.2}
+    config.enabled = {true, true, false}
+    
+    -- Access array elements (Lua uses 1-based indexing)
+    print(config.hosts[1])  -- "api1.example.com"
+    
+    -- Use Lua's table functions
+    table.insert(config.hosts, "api4.example.com")
+    
+    -- Iterate over arrays
+    for i, host in ipairs(config.hosts) do
+        print(i, host, config.ports[i])
+    end
+""")
+
+// Arrays set in Swift are accessible in Lua
+config.hosts = ["db1.local", "db2.local"]
+let count = try lua.executeReturning("return #config.hosts", as: Int.self)  // 2
 ```
 
 ## Bridging Modes

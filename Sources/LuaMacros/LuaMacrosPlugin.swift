@@ -325,7 +325,16 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                         let propType = binding.typeAnnotation?.type.description ?? "Unknown"
                         
                         codeLines.append("    case \"\(propName)\":")
-                        if propType.contains("Int") {
+                        // Handle array types first
+                        if propType.contains("[String]") {
+                            codeLines.append("        [String].push(obj.\(propName), to: L)")
+                        } else if propType.contains("[Int]") {
+                            codeLines.append("        [Int].push(obj.\(propName), to: L)")
+                        } else if propType.contains("[Double]") {
+                            codeLines.append("        [Double].push(obj.\(propName), to: L)")
+                        } else if propType.contains("[Bool]") {
+                            codeLines.append("        [Bool].push(obj.\(propName), to: L)")
+                        } else if propType.contains("Int") {
                             codeLines.append("        lua_pushinteger(L, lua_Integer(obj.\(propName)))")
                         } else if propType.contains("Double") || propType.contains("Float") {
                             codeLines.append("        lua_pushnumber(L, lua_Number(obj.\(propName)))")
@@ -387,7 +396,52 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                             codeLines.append("        let oldValue = obj.\(propName) as Any?")
                             
                             // Extract the new value based on type
-                            if propType.contains("Int") {
+                            // Handle array types first
+                            if propType.contains("[String]") {
+                                codeLines.append("        guard let newValue = [String].pull(from: L, at: 3) else {")
+                                codeLines.append("            return luaError(L, \"Expected array of strings for \(propName)\")")
+                                codeLines.append("        }")
+                                codeLines.append("        switch obj.luaPropertyWillChange(\"\(propName)\", from: oldValue, to: newValue) {")
+                                codeLines.append("        case .success:")
+                                codeLines.append("            obj.\(propName) = newValue")
+                                codeLines.append("            obj.luaPropertyDidChange(\"\(propName)\", from: oldValue, to: newValue)")
+                                codeLines.append("        case .failure(let error):")
+                                codeLines.append("            return luaError(L, error.message)")
+                                codeLines.append("        }")
+                            } else if propType.contains("[Int]") {
+                                codeLines.append("        guard let newValue = [Int].pull(from: L, at: 3) else {")
+                                codeLines.append("            return luaError(L, \"Expected array of integers for \(propName)\")")
+                                codeLines.append("        }")
+                                codeLines.append("        switch obj.luaPropertyWillChange(\"\(propName)\", from: oldValue, to: newValue) {")
+                                codeLines.append("        case .success:")
+                                codeLines.append("            obj.\(propName) = newValue")
+                                codeLines.append("            obj.luaPropertyDidChange(\"\(propName)\", from: oldValue, to: newValue)")
+                                codeLines.append("        case .failure(let error):")
+                                codeLines.append("            return luaError(L, error.message)")
+                                codeLines.append("        }")
+                            } else if propType.contains("[Double]") {
+                                codeLines.append("        guard let newValue = [Double].pull(from: L, at: 3) else {")
+                                codeLines.append("            return luaError(L, \"Expected array of numbers for \(propName)\")")
+                                codeLines.append("        }")
+                                codeLines.append("        switch obj.luaPropertyWillChange(\"\(propName)\", from: oldValue, to: newValue) {")
+                                codeLines.append("        case .success:")
+                                codeLines.append("            obj.\(propName) = newValue")
+                                codeLines.append("            obj.luaPropertyDidChange(\"\(propName)\", from: oldValue, to: newValue)")
+                                codeLines.append("        case .failure(let error):")
+                                codeLines.append("            return luaError(L, error.message)")
+                                codeLines.append("        }")
+                            } else if propType.contains("[Bool]") {
+                                codeLines.append("        guard let newValue = [Bool].pull(from: L, at: 3) else {")
+                                codeLines.append("            return luaError(L, \"Expected array of booleans for \(propName)\")")
+                                codeLines.append("        }")
+                                codeLines.append("        switch obj.luaPropertyWillChange(\"\(propName)\", from: oldValue, to: newValue) {")
+                                codeLines.append("        case .success:")
+                                codeLines.append("            obj.\(propName) = newValue")
+                                codeLines.append("            obj.luaPropertyDidChange(\"\(propName)\", from: oldValue, to: newValue)")
+                                codeLines.append("        case .failure(let error):")
+                                codeLines.append("            return luaError(L, error.message)")
+                                codeLines.append("        }")
+                            } else if propType.contains("Int") {
                                 codeLines.append("        let newValue = Int(luaL_checkinteger(L, 3))")
                                 codeLines.append("        switch obj.luaPropertyWillChange(\"\(propName)\", from: oldValue, to: newValue) {")
                                 codeLines.append("        case .success:")

@@ -197,3 +197,44 @@ extension String: LuaConvertible {
         return String(cString: cStr)
     }
 }
+
+// MARK: - Array Support
+
+extension Array: LuaConvertible where Element: LuaConvertible {
+    public static func push(_ value: [Element], to L: OpaquePointer) {
+        lua_createtable(L, Int32(value.count), 0)
+        for (index, element) in value.enumerated() {
+            Element.push(element, to: L)
+            lua_rawseti(L, -2, lua_Integer(index + 1))  // Lua arrays are 1-indexed
+        }
+    }
+    
+    public static func pull(from L: OpaquePointer, at index: Int32) -> [Element]? {
+        guard lua_type(L, index) == LUA_TTABLE else { return nil }
+        
+        var array: [Element] = []
+        let tableIndex = lua_absindex(L, index)
+        
+        // Get array length
+        let len = lua_rawlen(L, tableIndex)
+        
+        // Handle empty arrays
+        if len == 0 {
+            return array
+        }
+        
+        for i in 1...len {
+            lua_rawgeti(L, tableIndex, lua_Integer(i))
+            if let element = Element.pull(from: L, at: -1) {
+                array.append(element)
+            } else {
+                // If we can't convert an element, fail the whole array
+                lua_pop(L, 1)
+                return nil
+            }
+            lua_pop(L, 1)
+        }
+        
+        return array
+    }
+}

@@ -1,4 +1,4 @@
-# LuaKit 5.4.8
+# LuaKit 1.0.0+lua5.4.8
 
 Swift framework for embedding Lua scripting into iOS and macOS applications with powerful macro support.
 
@@ -9,6 +9,11 @@ Swift framework for embedding Lua scripting into iOS and macOS applications with
 - Track property modifications from Lua for persistence, logging, or debugging
 - Validate and reject property changes with custom error messages using Result type
 - Default implementations ensure backward compatibility
+
+### Array Support
+- Full support for array properties: `[String]`, `[Int]`, `[Double]`, `[Bool]`
+- Seamless Swift-Lua array bridging with automatic type conversion
+- Respects Lua's 1-based indexing conventions
 
 ### Embedded Lua
 - Lua 5.4.8 is now embedded directly in LuaKit
@@ -38,7 +43,7 @@ Swift framework for embedding Lua scripting into iOS and macOS applications with
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/barryw/LuaKit", from: "5.4.8")
+    .package(url: "https://github.com/barryw/LuaKit", from: "1.0.0")
 ]
 ```
 
@@ -162,7 +167,8 @@ These limitations are documented in the README and will be addressed as Swift's 
 
 ## 📝 Version Note
 
-Version 5.4.8 matches the underlying Lua version for clarity.
+LuaKit uses semantic versioning (major.minor.patch) with the embedded Lua version shown as build metadata.
+This release: `1.0.0+lua5.4.8` indicates LuaKit 1.0.0 with Lua 5.4.8 embedded.
 
 ## 📄 License
 
