@@ -51,6 +51,12 @@ public struct LuaBridgeableMacro: MemberMacro {
                 let isPublic = method.modifiers.contains { $0.name.tokenKind == .keyword(.public) }
                 guard isPublic else { return false }
                 
+                // Exclude property change notification methods
+                let methodName = method.name.text
+                if methodName == "luaPropertyWillChange" || methodName == "luaPropertyDidChange" {
+                    return false
+                }
+                
                 return shouldBridgeMember(member: member, bridgeMode: bridgeMode)
             }
             .map { $0.0 } // Extract just the method declarations
@@ -376,19 +382,58 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                             let propType = binding.typeAnnotation?.type.description ?? "Unknown"
                             
                             codeLines.append("    case \"\(propName)\":")
+                            
+                            // Get the old value first
+                            codeLines.append("        let oldValue = obj.\(propName) as Any?")
+                            
+                            // Extract the new value based on type
                             if propType.contains("Int") {
-                                codeLines.append("        obj.\(propName) = Int(luaL_checkinteger(L, 3))")
+                                codeLines.append("        let newValue = Int(luaL_checkinteger(L, 3))")
+                                codeLines.append("        switch obj.luaPropertyWillChange(\"\(propName)\", from: oldValue, to: newValue) {")
+                                codeLines.append("        case .success:")
+                                codeLines.append("            obj.\(propName) = newValue")
+                                codeLines.append("            obj.luaPropertyDidChange(\"\(propName)\", from: oldValue, to: newValue)")
+                                codeLines.append("        case .failure(let error):")
+                                codeLines.append("            return luaError(L, error.message)")
+                                codeLines.append("        }")
                             } else if propType.contains("Double") {
-                                codeLines.append("        obj.\(propName) = lua_tonumberx(L, 3, nil)")
+                                codeLines.append("        let newValue = lua_tonumberx(L, 3, nil)")
+                                codeLines.append("        switch obj.luaPropertyWillChange(\"\(propName)\", from: oldValue, to: newValue) {")
+                                codeLines.append("        case .success:")
+                                codeLines.append("            obj.\(propName) = newValue")
+                                codeLines.append("            obj.luaPropertyDidChange(\"\(propName)\", from: oldValue, to: newValue)")
+                                codeLines.append("        case .failure(let error):")
+                                codeLines.append("            return luaError(L, error.message)")
+                                codeLines.append("        }")
                             } else if propType.contains("Float") {
-                                codeLines.append("        obj.\(propName) = Float(lua_tonumberx(L, 3, nil))")
+                                codeLines.append("        let newValue = Float(lua_tonumberx(L, 3, nil))")
+                                codeLines.append("        switch obj.luaPropertyWillChange(\"\(propName)\", from: oldValue, to: newValue) {")
+                                codeLines.append("        case .success:")
+                                codeLines.append("            obj.\(propName) = newValue")
+                                codeLines.append("            obj.luaPropertyDidChange(\"\(propName)\", from: oldValue, to: newValue)")
+                                codeLines.append("        case .failure(let error):")
+                                codeLines.append("            return luaError(L, error.message)")
+                                codeLines.append("        }")
                             } else if propType.contains("String") {
-                                codeLines.append("        guard let value = String.pull(from: L, at: 3) else {")
+                                codeLines.append("        guard let newValue = String.pull(from: L, at: 3) else {")
                                 codeLines.append("            return luaError(L, \"Expected string for \(propName)\")")
                                 codeLines.append("        }")
-                                codeLines.append("        obj.\(propName) = value")
+                                codeLines.append("        switch obj.luaPropertyWillChange(\"\(propName)\", from: oldValue, to: newValue) {")
+                                codeLines.append("        case .success:")
+                                codeLines.append("            obj.\(propName) = newValue")
+                                codeLines.append("            obj.luaPropertyDidChange(\"\(propName)\", from: oldValue, to: newValue)")
+                                codeLines.append("        case .failure(let error):")
+                                codeLines.append("            return luaError(L, error.message)")
+                                codeLines.append("        }")
                             } else if propType.contains("Bool") {
-                                codeLines.append("        obj.\(propName) = lua_toboolean(L, 3) != 0")
+                                codeLines.append("        let newValue = lua_toboolean(L, 3) != 0")
+                                codeLines.append("        switch obj.luaPropertyWillChange(\"\(propName)\", from: oldValue, to: newValue) {")
+                                codeLines.append("        case .success:")
+                                codeLines.append("            obj.\(propName) = newValue")
+                                codeLines.append("            obj.luaPropertyDidChange(\"\(propName)\", from: oldValue, to: newValue)")
+                                codeLines.append("        case .failure(let error):")
+                                codeLines.append("            return luaError(L, error.message)")
+                                codeLines.append("        }")
                             }
                         }
                     }

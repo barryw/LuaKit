@@ -13,7 +13,13 @@ import Lua
 extension LuaState {
     /// Provides access to Lua global variables
     public var globals: LuaGlobals {
-        return LuaGlobals(luaState: self)
+        get {
+            return LuaGlobals(luaState: self)
+        }
+        set {
+            // This setter exists only to enable subscript setters
+            // The actual value is ignored since globals is computed
+        }
     }
     
     /// Convert a Swift object to a Lua reference

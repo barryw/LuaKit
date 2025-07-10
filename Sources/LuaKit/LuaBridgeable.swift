@@ -8,6 +8,19 @@
 import Foundation
 import Lua
 
+/// Error type for property validation failures
+public struct PropertyValidationError: Error, CustomStringConvertible {
+    public let message: String
+    
+    public init(_ message: String) {
+        self.message = message
+    }
+    
+    public var description: String {
+        return message
+    }
+}
+
 public protocol LuaBridgeable: AnyObject {
     static var metaTableName: String { get }
     static func register(in state: LuaState, as name: String)
@@ -15,11 +28,25 @@ public protocol LuaBridgeable: AnyObject {
     static func registerConstructor(_ L: OpaquePointer, name: String)
     static func luaNew(_ L: OpaquePointer) -> Int32
     static func pushAny(_ object: LuaBridgeable, to L: OpaquePointer)
+    
+    // Optional property change notifications
+    func luaPropertyWillChange(_ propertyName: String, from oldValue: Any?, to newValue: Any?) -> Result<Void, PropertyValidationError>
+    func luaPropertyDidChange(_ propertyName: String, from oldValue: Any?, to newValue: Any?)
 }
 
 extension LuaBridgeable {
     public static var metaTableName: String {
         return String(describing: Self.self) + "_meta"
+    }
+    
+    // Default implementations for property change notifications
+    public func luaPropertyWillChange(_ propertyName: String, from oldValue: Any?, to newValue: Any?) -> Result<Void, PropertyValidationError> {
+        // Default implementation allows all changes
+        return .success(())
+    }
+    
+    public func luaPropertyDidChange(_ propertyName: String, from oldValue: Any?, to newValue: Any?) {
+        // Default implementation does nothing
     }
     
     public static func register(in state: LuaState, as name: String) {

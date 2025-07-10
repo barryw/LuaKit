@@ -82,7 +82,7 @@ final class BasicTests: XCTestCase {
         let lua = try LuaState()
         
         // Execute Lua code
-        try lua.execute("print('Hello from Lua!')")
+        _ = try lua.execute("print('Hello from Lua!')")
         
         // Get values from Lua
         let result = try lua.executeReturning("return 2 + 2", as: Int.self)
@@ -94,7 +94,7 @@ final class BasicTests: XCTestCase {
         let lua = try LuaState()
         
         do {
-            try lua.execute("invalid lua code")
+            _ = try lua.execute("invalid lua code")
             XCTFail("Should have thrown syntax error")
         } catch LuaError.syntax(let message) {
             // Success - we caught the syntax error as documented
@@ -104,7 +104,7 @@ final class BasicTests: XCTestCase {
         }
         
         do {
-            try lua.execute("error('test runtime error')")
+            _ = try lua.execute("error('test runtime error')")
             XCTFail("Should have thrown runtime error")
         } catch LuaError.runtime(let message) {
             // Success - we caught the runtime error as documented

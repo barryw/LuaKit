@@ -1,6 +1,6 @@
 # LuaKit
 
-A Swift framework for embedding Lua scripting into iOS and macOS applications with seamless Swift-Lua bridging. LuaKit includes Lua 5.4.7 embedded directly, requiring no external dependencies.
+A Swift framework for embedding Lua scripting into iOS and macOS applications with seamless Swift-Lua bridging. LuaKit includes Lua 5.4.8 embedded directly, requiring no external dependencies.
 
 ## Features
 
@@ -8,6 +8,7 @@ A Swift framework for embedding Lua scripting into iOS and macOS applications wi
 - **Swift-Lua Bridging**: Expose Swift classes and methods to Lua with minimal boilerplate
 - **Type Safety**: Automatic type conversion between Swift and Lua types
 - **Macro Support**: Use `@LuaBridgeable` macro to automatically generate bridging code
+- **Property Change Notifications**: Track and validate property changes from Lua
 - **Global Variables**: Easy access to Lua globals with Swift subscript syntax
 - **Tables**: Create and manipulate Lua tables from Swift
 - **Error Handling**: Comprehensive error reporting for syntax and runtime errors
@@ -20,7 +21,7 @@ Add LuaKit to your `Package.swift` file:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/barryw/LuaKit", from: "5.4.7")
+    .package(url: "https://github.com/barryw/LuaKit", from: "5.4.8")
 ]
 ```
 
@@ -305,6 +306,139 @@ public class SecureData {
     
     public func deleteAll() { }  // ❌ Not bridged
 }
+```
+
+## Property Change Notifications
+
+LuaBridgeable classes can track and control property changes made from Lua by implementing optional notification methods:
+
+### Basic Usage
+
+```swift
+@LuaBridgeable
+public class TrackedModel: LuaBridgeable {
+    public var name: String
+    public var value: Int
+    
+    public init(name: String, value: Int) {
+        self.name = name
+        self.value = value
+    }
+    
+    // Called before a property is changed from Lua
+    public func luaPropertyWillChange(_ propertyName: String, from oldValue: Any?, to newValue: Any?) -> Result<Void, PropertyValidationError> {
+        print("Property '\(propertyName)' will change from \(oldValue ?? "nil") to \(newValue ?? "nil")")
+        
+        // Return failure to reject the change with a custom error message
+        if propertyName == "value", let newInt = newValue as? Int, newInt < 0 {
+            return .failure(PropertyValidationError("Value cannot be negative (attempted to set to \(newInt))"))
+        }
+        
+        return .success(()) // Allow the change
+    }
+    
+    // Called after a property has been changed from Lua
+    public func luaPropertyDidChange(_ propertyName: String, from oldValue: Any?, to newValue: Any?) {
+        print("Property '\(propertyName)' changed from \(oldValue ?? "nil") to \(newValue ?? "nil")")
+    }
+    
+    public var description: String {
+        return "TrackedModel(name: \(name), value: \(value))"
+    }
+}
+```
+
+### Persistence Example
+
+```swift
+@LuaBridgeable
+public class PersistentModel: LuaBridgeable {
+    public var data: String
+    private var isDirty = false
+    
+    public init(data: String) {
+        self.data = data
+    }
+    
+    public func luaPropertyDidChange(_ propertyName: String, from oldValue: Any?, to newValue: Any?) {
+        isDirty = true
+        // In a real app, you might schedule a save operation here
+        saveToDatabase()
+    }
+    
+    private func saveToDatabase() {
+        // Persist changes to your database
+        print("Saving \(propertyName) = \(newValue) to database")
+        isDirty = false
+    }
+    
+    public var description: String {
+        return "PersistentModel(data: \(data))"
+    }
+}
+```
+
+### Validation Example
+
+```swift
+@LuaBridgeable
+public class ValidatedUser: LuaBridgeable {
+    public var email: String
+    public var age: Int
+    
+    public init(email: String, age: Int) {
+        self.email = email
+        self.age = age
+    }
+    
+    public func luaPropertyWillChange(_ propertyName: String, from oldValue: Any?, to newValue: Any?) -> Result<Void, PropertyValidationError> {
+        switch propertyName {
+        case "email":
+            guard let newEmail = newValue as? String,
+                  newEmail.contains("@") && newEmail.contains(".") else {
+                return .failure(PropertyValidationError("Invalid email format"))
+            }
+        case "age":
+            guard let newAge = newValue as? Int,
+                  newAge >= 0 && newAge <= 150 else {
+                return .failure(PropertyValidationError("Age must be between 0 and 150"))
+            }
+        default:
+            break
+        }
+        return .success(())
+    }
+    
+    public var description: String {
+        return "ValidatedUser(email: \(email), age: \(age))"
+    }
+}
+```
+
+### Default Behavior
+
+If you don't implement these methods, the default behavior is:
+- `luaPropertyWillChange`: Always returns `.success(())` (allows all changes)
+- `luaPropertyDidChange`: Does nothing (no-op)
+
+This means existing code continues to work without modification.
+
+### Error Handling
+
+When `luaPropertyWillChange` returns `.failure(PropertyValidationError)`, the property setter raises a Lua runtime error with the custom error message you provide. This allows for descriptive validation errors that help users understand why their change was rejected.
+
+This follows Lua's standard error handling patterns, allowing you to catch the error with `pcall`:
+
+```lua
+local success, err = pcall(function()
+    obj.value = -5  -- This might be rejected
+end)
+
+if not success then
+    print("Property change rejected:", err)
+    -- Error message will be your custom validation error, e.g.:
+    -- "Value cannot be negative (attempted to set to -5)"
+end
 ```
 
 ## Error Handling
