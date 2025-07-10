@@ -22,7 +22,7 @@ Add LuaKit to your `Package.swift` file:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/barryw/LuaKit", from: "1.0.0")
+    .package(url: "https://github.com/barryw/LuaKit", from: "1.1.0")
 ]
 ```
 
@@ -301,8 +301,12 @@ try lua.execute("""
     -- Access array elements (Lua uses 1-based indexing)
     print(config.hosts[1])  -- "api1.example.com"
     
-    -- Use Lua's table functions
-    table.insert(config.hosts, "api4.example.com")
+    -- Modify individual elements
+    config.hosts[2] = "api2-backup.example.com"
+    config.ports[3] = 9443
+    
+    -- Append elements by setting at length + 1
+    config.hosts[#config.hosts + 1] = "api4.example.com"
     
     -- Iterate over arrays
     for i, host in ipairs(config.hosts) do

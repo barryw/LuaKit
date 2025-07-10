@@ -4,6 +4,9 @@
 //
 //  Tests for array property support
 //
+//  Updated for LuaKit 1.1.0: Arrays now return proxies that support
+//  individual element access (e.g., config.ports[1] = 80)
+//
 
 import XCTest
 import Lua
@@ -120,11 +123,10 @@ class ArrayPropertyTests: XCTestCase {
         XCTAssertEqual(config.ports.count, 4)
         XCTAssertEqual(config.ports, [80, 443, 8080, 8443])
         
-        // Use Lua table functions
+        // Add element using array proxy - NEW IN 1.1.0
         _ = try lua.execute("""
-            local ports = config.ports
-            table.insert(ports, 9000)
-            config.ports = ports
+            -- With array proxies, append by setting at length + 1
+            config.ports[#config.ports + 1] = 9000
         """)
         
         XCTAssertEqual(config.ports.count, 5)
@@ -321,11 +323,10 @@ class ArrayPropertyTests: XCTestCase {
             end
         """)
         
-        // Modify and check
+        // Modify and check - NEW IN 1.1.0: Direct element access
         _ = try lua.execute("""
-            local servers = config.servers
-            servers[1] = "primary.local"
-            config.servers = servers
+            -- With array proxies, modify elements directly
+            config.servers[1] = "primary.local"
         """)
         
         XCTAssertEqual(config.servers[0], "primary.local")

@@ -180,11 +180,20 @@ public func demonstrateArraySupport() throws {
                 i, star, song, playlist.ratings[i], playlist.durations[i]))
         end
         
-        -- Add a new song
-        table.insert(playlist.songs, "Wonderwall")
-        table.insert(playlist.durations, 258)
-        table.insert(playlist.ratings, 4)
-        table.insert(playlist.favorites, false)
+        -- NEW IN 1.1.0: Modify individual array elements
+        print("\n-- Modifying individual elements:")
+        playlist.ratings[3] = 5  -- Upgrade Stairway to Heaven to 5 stars
+        print("Updated rating for", playlist.songs[3], "to", playlist.ratings[3], "stars")
+        
+        playlist.favorites[3] = true  -- Now it's a favorite too
+        print(playlist.songs[3], "is now a favorite!")
+        
+        -- NEW IN 1.1.0: Add a new song using array index
+        local newIndex = #playlist.songs + 1
+        playlist.songs[newIndex] = "Wonderwall"
+        playlist.durations[newIndex] = 258
+        playlist.ratings[newIndex] = 4
+        playlist.favorites[newIndex] = false
         
         print("\nAfter adding:", playlist)
     """)
@@ -215,13 +224,22 @@ public func demonstrateArraySupport() throws {
         
         print("Configuration:", netconfig)
         
-        -- Try invalid configuration (will be rejected)
+        -- NEW IN 1.1.0: Modify individual server addresses
+        print("\n-- Modifying individual server addresses:")
+        netconfig.servers[2] = "api2-new.example.com"
+        print("Updated server 2 to:", netconfig.servers[2])
+        
+        -- NEW IN 1.1.0: Try to set invalid port (will be rejected)
         local success, err = pcall(function()
-            netconfig.allowedPorts = {80, 443, 99999}  -- Invalid port
+            netconfig.allowedPorts[5] = 99999  -- Invalid port at index 5
         end)
         if not success then
-            print("Validation error:", err:match("([^:]+)$"))
+            print("Validation error for individual element:", err:match("([^:]+)$"))
         end
+        
+        -- NEW IN 1.1.0: Add valid port by index
+        netconfig.allowedPorts[#netconfig.allowedPorts + 1] = 3000
+        print("Added port 3000, total ports:", #netconfig.allowedPorts)
         
         -- Dynamic server selection
         print("\nActive servers:")
@@ -255,6 +273,12 @@ public func demonstrateArraySupport() throws {
         for i, value in ipairs(processor.results) do
             print(string.format("  [%d] %.4f", i, value))
         end
+        
+        -- NEW IN 1.1.0: Modify specific results
+        print("\n-- Modifying individual results:")
+        processor.results[1] = processor.results[1] * 2
+        processor.results[5] = 0.5
+        print("Modified results[1] (doubled) and results[5] (set to 0.5)")
         
         -- Get statistics
         local stats = processor:getStatistics()

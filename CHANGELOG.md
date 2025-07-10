@@ -5,16 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0+lua5.4.8] - 2025-07-10
+## [1.1.0+lua5.4.8] - 2025-07-10
 
 ### Added
 - Full array support for primitive types (`[String]`, `[Int]`, `[Double]`, `[Bool]`)
+- Individual array element access from Lua (e.g., `palette.colors[1] = "red"`)
+- Array proxy implementation with Lua metamethods (__index, __newindex, __len, __ipairs, __tostring)
 - Comprehensive array tests and examples
 - ArrayExample.swift demonstrating array usage patterns
 
 ### Changed
 - Switched to semantic versioning with Lua version as build metadata
 - Updated documentation to reflect new versioning scheme
+- Array properties now return proxies instead of direct arrays for element-level access
 
 ## [5.4.8] - 2025-07-09
 

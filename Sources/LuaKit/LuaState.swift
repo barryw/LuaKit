@@ -18,6 +18,7 @@ public final class LuaState {
         self.L = state
         luaL_openlibs(L)
         setupPrintCapture()
+        registerArrayProxyTypes()
     }
     
     deinit {
@@ -85,6 +86,14 @@ public final class LuaState {
     }
     
     private static var states: [OpaquePointer: LuaState] = [:]
+    
+    private func registerArrayProxyTypes() {
+        // Register array proxy types for each supported element type
+        LuaStringArrayProxy.register(in: self, as: "_StringArrayProxy")
+        LuaIntArrayProxy.register(in: self, as: "_IntArrayProxy")
+        LuaDoubleArrayProxy.register(in: self, as: "_DoubleArrayProxy")
+        LuaBoolArrayProxy.register(in: self, as: "_BoolArrayProxy")
+    }
     
     public func execute(_ code: String) throws -> String {
         printOutput = ""
