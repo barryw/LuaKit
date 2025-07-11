@@ -494,6 +494,36 @@ if not success then
 end
 ```
 
+## Closure Bridging
+
+Pass Swift closures to Lua as callable functions:
+
+```swift
+// Simple closure
+lua.globals["greet"] = LuaFunction { 
+    return "Hello from Swift!" 
+}
+
+// Closure with parameters
+lua.registerFunction("add") { (a: Int, b: Int) in
+    return a + b
+}
+
+// Closure returning Swift objects
+lua.registerFunction("createPoint") { (x: Double, y: Double) in
+    return Point(x: x, y: y)  // Returns a LuaBridgeable object
+}
+
+// Use from Lua
+try lua.execute("""
+    print(greet())                    -- "Hello from Swift!"
+    print("Sum:", add(10, 32))        -- "Sum: 42"
+    
+    local p = createPoint(5.0, 10.0)
+    print("Point:", p.x, p.y)         -- "Point: 5.0 10.0"
+""")
+```
+
 ## Error Handling
 
 LuaKit provides detailed error information:

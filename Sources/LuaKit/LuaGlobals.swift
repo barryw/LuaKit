@@ -86,6 +86,8 @@ public struct LuaGlobals {
                 lua_pushnumber(L, double)
             case let string as String:
                 lua_pushstring(L, string)
+            case let function as LuaFunction:
+                function.push(to: L)
             case let bridgeable as LuaBridgeable:
                 pushBridgeable(bridgeable, to: L)
             case let reference as LuaReference:
@@ -259,6 +261,8 @@ public class LuaTable {
                 lua_pushnumber(L, double)
             case let string as String:
                 lua_pushstring(L, string)
+            case let function as LuaFunction:
+                function.push(to: L)
             case let bridgeable as LuaBridgeable:
                 pushBridgeable(bridgeable, to: L)
             case let reference as LuaReference:

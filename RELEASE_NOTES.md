@@ -1,8 +1,15 @@
-# LuaKit 1.1.1+lua5.4.8
+# LuaKit 1.2.0+lua5.4.8
 
 Swift framework for embedding Lua scripting into iOS and macOS applications with powerful macro support.
 
 ## 🆕 What's New in This Release
+
+### Closure Bridging (NEW!)
+- Pass Swift closures to Lua as callable functions
+- Support for closures with 0-3 parameters
+- Automatic type conversion for parameters and return values
+- Return LuaBridgeable objects from closures to Lua
+- Convenient `registerFunction` methods for global function registration
 
 ### Property Change Notifications
 - Added `luaPropertyWillChange` and `luaPropertyDidChange` methods to LuaBridgeable protocol
@@ -154,11 +161,44 @@ These limitations are documented in the README and will be addressed as Swift's 
 - Explicit mode with @LuaOnly
 - Property change notifications
 
+## 🚀 Closure Bridging Example
+
+```swift
+import LuaKit
+
+let lua = try LuaState()
+
+// Register a simple closure
+lua.globals["greet"] = LuaFunction { 
+    return "Hello from Swift!" 
+}
+
+// Register a closure with parameters
+lua.registerFunction("add") { (a: Int, b: Int) in
+    return a + b
+}
+
+// Register a closure that returns a Swift object
+lua.registerFunction("createUser") { (name: String) -> User in
+    return User(name: name, id: UUID())
+}
+
+// Use from Lua
+try lua.execute("""
+    print(greet())                    -- "Hello from Swift!"
+    print("Sum:", add(10, 32))        -- "Sum: 42"
+    
+    local user = createUser("Alice")
+    print("User:", user.name)         -- "User: Alice"
+""")
+```
+
 ## 📚 Examples
 
 - `MacroExample.swift`: Comprehensive macro demonstrations
 - `ManualBridgingExample.swift`: Shows manual implementation
 - `PropertyChangeExample.swift`: Property change notifications with validation and persistence
+- `ClosureBridgingExample.swift`: Closure bridging demonstrations
 - `Image.swift`: Basic @LuaBridgeable usage
 
 ## 🔧 Requirements
@@ -170,7 +210,7 @@ These limitations are documented in the README and will be addressed as Swift's 
 ## 📝 Version Note
 
 LuaKit uses semantic versioning (major.minor.patch) with the embedded Lua version shown as build metadata.
-This release: `1.1.1+lua5.4.8` indicates LuaKit 1.1.1 with Lua 5.4.8 embedded.
+This release: `1.2.0+lua5.4.8` indicates LuaKit 1.2.0 with Lua 5.4.8 embedded.
 
 ## 📄 License
 
