@@ -12,6 +12,7 @@ import Lua
 public class LuaFunction {
     // Global registry of closures by ID
     private static var closures: [Int: (OpaquePointer) -> Int32] = [:]
+    private static var retainedFunctions: [Int: LuaFunction] = [:]
     private static var nextId: Int = 1
     private static let lock = NSLock()
     
@@ -97,10 +98,16 @@ public class LuaFunction {
         LuaFunction.lock.lock()
         defer { LuaFunction.lock.unlock() }
         LuaFunction.closures.removeValue(forKey: self.id)
+        LuaFunction.retainedFunctions.removeValue(forKey: self.id)
     }
     
     /// Pushes the function onto the Lua stack
     func push(to L: OpaquePointer) {
+        // Keep a strong reference to self
+        LuaFunction.lock.lock()
+        LuaFunction.retainedFunctions[self.id] = self
+        LuaFunction.lock.unlock()
+        
         // Create a Lua table to hold the function ID
         lua_createtable(L, 0, 1)
         
@@ -142,25 +149,37 @@ public class LuaFunction {
         }, 0)
         lua_settable(L, -3)
         
+        // Set __gc metamethod to release the retained reference
+        lua_pushstring(L, "__gc")
+        lua_pushcclosure(L, { L in
+            guard let L = L else { return 0 }
+            
+            // Get the function ID from the table
+            lua_getfield(L, 1, "_luakit_function_id")
+            let id = Int(lua_tointegerx(L, -1, nil))
+            
+            // Release the retained reference
+            LuaFunction.lock.lock()
+            LuaFunction.retainedFunctions.removeValue(forKey: id)
+            LuaFunction.lock.unlock()
+            
+            return 0
+        }, 0)
+        lua_settable(L, -3)
+        
         // Set the metatable
         lua_setmetatable(L, -2)
     }
     
     /// Helper method to push results onto the Lua stack
     private static func pushResult<R>(_ result: R, to L: OpaquePointer) -> Int32 {
-        switch result {
-        case is Void:
+        // Check for Void first
+        if result is Void {
             return 0
-        case let bridgeable as LuaBridgeable:
-            type(of: bridgeable).pushAny(bridgeable, to: L)
-            return 1
-        case let optional as Any?:
-            if let value = optional {
-                return pushResult(value, to: L)
-            } else {
-                lua_pushnil(L)
-                return 1
-            }
+        }
+        
+        // Check for concrete types before protocols
+        switch result {
         case let bool as Bool:
             lua_pushboolean(L, bool ? 1 : 0)
             return 1
@@ -172,6 +191,16 @@ public class LuaFunction {
             return 1
         case let string as String:
             lua_pushstring(L, string)
+            return 1
+        case let optional as Any?:
+            if let value = optional {
+                return pushResult(value, to: L)
+            } else {
+                lua_pushnil(L)
+                return 1
+            }
+        case let bridgeable as LuaBridgeable:
+            type(of: bridgeable).pushAny(bridgeable, to: L)
             return 1
         default:
             lua_pushnil(L)
