@@ -1,10 +1,15 @@
-# LuaKit 1.2.0+lua5.4.8
+# LuaKit 1.2.1+lua5.4.8
 
 Swift framework for embedding Lua scripting into iOS and macOS applications with powerful macro support.
 
 ## 🆕 What's New in This Release
 
-### Closure Bridging (NEW!)
+### Critical Bug Fixes
+- Fixed EXC_BAD_ACCESS crash in closure bridging
+- Fixed memory management issues causing "Function no longer exists" errors
+- Improved type checking order to prevent runtime crashes
+
+### Closure Bridging (Stable)
 - Pass Swift closures to Lua as callable functions
 - Support for closures with 0-3 parameters
 - Automatic type conversion for parameters and return values
@@ -210,7 +215,7 @@ try lua.execute("""
 ## 📝 Version Note
 
 LuaKit uses semantic versioning (major.minor.patch) with the embedded Lua version shown as build metadata.
-This release: `1.2.0+lua5.4.8` indicates LuaKit 1.2.0 with Lua 5.4.8 embedded.
+This release: `1.2.1+lua5.4.8` indicates LuaKit 1.2.1 with Lua 5.4.8 embedded.
 
 ## 📄 License
 
