@@ -15,7 +15,7 @@ class MacroTestPerson: LuaBridgeable {  // Must explicitly conform
     var name: String
     var age: Int
 
-    init(name: String, age: Int) {
+    init(name: String = "Anonymous", age: Int = 0) {
         self.name = name
         self.age = age
     }
@@ -45,7 +45,7 @@ class SecureData: LuaBridgeable {  // Must explicitly conform
 
     var privateData: String  // Should not be bridged
 
-    init(publicName: String, privateData: String) {
+    init(publicName: String = "public", privateData: String = "private") {
         self.publicName = publicName
         self.privateData = privateData
     }
@@ -70,7 +70,7 @@ class Image: LuaBridgeable {
     var width: Int
     var height: Int
 
-    init(width: Int, height: Int) {
+    init(width: Int = 0, height: Int = 0) {
         self.width = width
         self.height = height
     }

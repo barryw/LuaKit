@@ -19,7 +19,7 @@ class TrackingModel: LuaBridgeable {
     var changeHistory: [(property: String, oldValue: Any?, newValue: Any?)] = []
     var rejectedChanges: [(property: String, attemptedValue: Any?)] = []
 
-    init(name: String, value: Int) {
+    init(name: String = "Untitled", value: Int = 0) {
         self.name = name
         self.value = value
     }
@@ -52,7 +52,7 @@ class PersistentModel: LuaBridgeable {
     // Simulated persistence store
     static var persistedData: [String: Any] = [:]
 
-    init(data: String) {
+    init(data: String = "empty") {
         self.data = data
     }
 
@@ -77,7 +77,7 @@ class PersistentModel: LuaBridgeable {
 class DefaultBehaviorModel: LuaBridgeable {
     var text: String
 
-    init(text: String) {
+    init(text: String = "default") {
         self.text = text
     }
 
@@ -207,7 +207,7 @@ class PropertyChangeTests: XCTestCase {
 
             var changes: [String] = []
 
-            init(name: String, age: Int) {
+            init(name: String = "Anonymous", age: Int = 0) {
                 self.name = name
                 self.age = age
                 self.active = true

@@ -23,7 +23,7 @@ class ArrayProxyPublicAPITest: XCTestCase {
             var name: String
             var colors: [String]
 
-            init(name: String) {
+            init(name: String = "Untitled") {
                 self.name = name
                 self.colors = []
             }
