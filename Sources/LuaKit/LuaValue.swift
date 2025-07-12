@@ -68,12 +68,12 @@ public enum LuaValue: Equatable, Hashable {
             return nil
         }
     }
-    
+
     private static func pullString(from L: OpaquePointer, at index: Int32) -> LuaValue? {
         guard let cStr = lua_tolstring(L, index, nil) else { return nil }
         return .string(String(cString: cStr))
     }
-    
+
     private static func pullTable(from L: OpaquePointer, at index: Int32) -> LuaValue? {
         var table: [String: LuaValue] = [:]
 

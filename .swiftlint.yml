@@ -67,6 +67,7 @@ disabled_rules:
   - type_name # Allow flexibility in naming
   - function_parameter_count # Lua bridging may require many parameters
 
+
 # Paths to include in linting
 included:
   - Sources
@@ -78,6 +79,8 @@ excluded:
   - .swiftpm
   - Examples
   - Docs
+  - Sources/LuaKit/LuaArrayProxy.swift  # Complex generated bridging code
+  - Sources/LuaMacros/LuaMacrosPlugin.swift  # Large macro implementation
 
 # Rule configurations
 line_length:

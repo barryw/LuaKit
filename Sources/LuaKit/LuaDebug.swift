@@ -218,12 +218,10 @@ public class LuaMemoryTracker {
 
         var report = "=== LuaKit Memory Report ===\n"
 
-        let sortedAllocations = allocations.sorted { $0.value > $1.value }
+        let sortedAllocations = allocations.filter { $0.value > 0 }.sorted { $0.value > $1.value }
 
         for (className, count) in sortedAllocations {
-            if count > 0 {
-                report += "\(className): \(count) instances\n"
-            }
+            report += "\(className): \(count) instances\n"
         }
 
         return report
