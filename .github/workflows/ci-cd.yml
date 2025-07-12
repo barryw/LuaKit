@@ -239,15 +239,15 @@ jobs:
 
     - name: Create GitHub Release
       if: steps.version.outputs.should_release == 'true' && steps.create_tag.outputs.tag_exists != 'true'
-      uses: actions/create-release@v1
+      run: |
+        gh release create "${{ steps.create_tag.outputs.tag_name }}" \
+          --title "LuaKit ${{ steps.version.outputs.full_version }}" \
+          --notes "${{ steps.release_notes.outputs.release_notes }}" \
+          --latest \
+          --verify-tag
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ steps.create_tag.outputs.tag_name }}
-        release_name: "LuaKit ${{ steps.version.outputs.full_version }}"
-        body: ${{ steps.release_notes.outputs.release_notes }}
-        draft: false
-        prerelease: false
+      id: create_release
 
     - name: Build release artifacts
       if: steps.version.outputs.should_release == 'true' && steps.create_tag.outputs.tag_exists != 'true'
@@ -263,14 +263,20 @@ jobs:
 
     - name: Upload release assets
       if: steps.version.outputs.should_release == 'true' && steps.create_tag.outputs.tag_exists != 'true'
-      uses: actions/upload-release-asset@v1
+      run: |
+        # Upload source archive
+        gh release upload "${{ steps.create_tag.outputs.tag_name }}" \
+          "LuaKit-${{ steps.version.outputs.full_version }}-source.tar.gz" \
+          --clobber
+        
+        # Upload binary archive if it exists
+        if [ -f "LuaKit-${{ steps.version.outputs.full_version }}-macos.tar.gz" ]; then
+          gh release upload "${{ steps.create_tag.outputs.tag_name }}" \
+            "LuaKit-${{ steps.version.outputs.full_version }}-macos.tar.gz" \
+            --clobber
+        fi
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./LuaKit-${{ steps.version.outputs.full_version }}-source.tar.gz
-        asset_name: LuaKit-${{ steps.version.outputs.full_version }}-source.tar.gz
-        asset_content_type: application/gzip
 
   notify:
     name: Notify Status
