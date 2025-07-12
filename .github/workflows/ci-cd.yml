@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
 env:
   SWIFT_VERSION: 5.9
   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -205,6 +210,9 @@ jobs:
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # Configure git to use the GitHub token for authentication
+        git config --local http.https://github.com/.extraheader "AUTHORIZATION: basic $(echo -n x-access-token:${{ secrets.GITHUB_TOKEN }} | base64)"
         
         TAG_NAME="${{ steps.version.outputs.full_version }}"
         git tag -a "$TAG_NAME" -m "LuaKit $TAG_NAME - Swift-Lua bridging with embedded Lua ${{ steps.version.outputs.lua_version }}"
