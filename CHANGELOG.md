@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0+lua5.4.8] - 2025-07-12
+
+### Added
+- Enhanced README with professional header, badges, and custom logo
+- Lua credits section with official Lua logo
+- CLAUDE.md documentation for AI assistant context
+- GitHub Actions permission fixes for automated releases
+
+### Fixed
+- Swift compilation errors in LuaGlobalRegistration.swift
+- Coverage profdata path issues in CI/CD pipeline
+- GitHub Actions tag creation permissions
+- @LuaBridgeable macro now recognizes internal visibility (not just public)
+
+### Changed
+- Improved CI/CD pipeline with architecture detection
+- Enhanced error handling for coverage data collection
+
+## [1.3.0+lua5.4.8] - 2025-07-12
+
+### Added
+Major enhancement release with 15 new features for advanced Swift-Lua bridging:
+
+#### Advanced Bridging Features
+- Method return type variants with `@LuaReturnVariant`
+- Collection syntax support (`collection[method](args)`)
+- Async/await integration with `@LuaAsync`
+- Aliasing support with `@LuaAlias`
+- Factory methods with `@LuaFactory`
+- Chainable methods with `@LuaChainable`
+- Type converters with `@LuaConvert`
+- Namespacing with `@LuaNamespace`
+- Relationships with `@LuaRelationship`
+
+#### Developer Experience
+- Documentation with `@LuaDoc` and `@LuaParam`
+- Property validation with custom validators
+- Global function registration
+- Enhanced error messages with suggestions
+- Debug helpers for runtime inspection
+
+### Fixed
+- Critical EXC_BAD_ACCESS crash in LuaFunction closure handling
+- Memory management improvements
+- Enhanced macro error handling
+
+## [1.2.1+lua5.4.8] - 2025-07-12
+
+### Fixed
+- Critical crash in LuaFunction closure bridging
+- Improved memory management for closure retention
+- Enhanced error context system
+
 ## [1.1.1+lua5.4.8] - 2025-07-10
 
 ### Fixed
