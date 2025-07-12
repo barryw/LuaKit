@@ -276,12 +276,14 @@ jobs:
     name: Notify Status
     runs-on: ubuntu-latest
     needs: [build-and-test, lint-and-format, security-scan, auto-release]
-    if: always()
+    if: always() && secrets.SLACK_WEBHOOK_URL != ''
     
     steps:
     - name: Notify Slack on Success
       if: needs.build-and-test.result == 'success' && needs.auto-release.result == 'success'
       uses: 8398a7/action-slack@v3
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       with:
         status: success
         text: |
@@ -291,11 +293,12 @@ jobs:
           📝 All tests passed: ${{ needs.build-and-test.outputs.test_count }} tests
           🔍 Security scan: Clean
           🚀 Release deployed successfully
-        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
 
     - name: Notify Slack on Failure
       if: needs.build-and-test.result == 'failure' || needs.lint-and-format.result == 'failure' || needs.security-scan.result == 'failure'
       uses: 8398a7/action-slack@v3
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       with:
         status: failure
         text: |
@@ -306,4 +309,3 @@ jobs:
           🛡️ Security: ${{ needs.security-scan.result }}
           
           Please check the logs for details.
-        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
