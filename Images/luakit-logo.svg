@@ -23,15 +23,12 @@
     <circle cx="30" cy="15" r="20" fill="#1a1a2e"/>
   </g>
   
-  <!-- Swift bird symbol (right) - Apple Swift bird -->
-  <g transform="translate(115, 55)">
-    <!-- Swift bird based on official logo -->
-    <g transform="scale(1.2)">
-      <!-- Wing/body -->
-      <path d="M 25 5 C 20 0, 12 -2, 8 0 C 12 4, 16 8, 18 12 C 15 10, 10 6, 5 4 C 8 10, 14 16, 20 20 C 16 18, 12 15, 8 11 C 10 16, 14 20, 18 23 C 22 26, 26 28, 30 28 C 28 24, 26 18, 25 12 C 24 8, 25 5, 25 5 Z" 
-            fill="url(#swiftGradient)"/>
-      <!-- Head/beak detail -->
-      <path d="M 25 5 C 26 4, 28 3, 30 4 C 28 6, 26 8, 25 10" 
+  <!-- Swift bird symbol (right) - Official Swift logo -->
+  <g transform="translate(110, 55)">
+    <!-- Official Swift bird shape - accurate representation -->
+    <g transform="scale(0.9)">
+      <!-- Swift bird with characteristic swoosh and feathers -->
+      <path d="M 38 8 C 36 4, 32 0, 28 0 C 30 4, 32 8, 33 12 C 28 8, 22 4, 16 2 C 20 8, 24 14, 27 20 C 22 16, 16 12, 10 8 C 14 14, 18 20, 22 24 C 16 22, 10 18, 4 14 C 10 20, 16 26, 22 30 C 20 32, 18 34, 16 35 C 22 35, 28 33, 32 28 C 36 32, 40 34, 44 34 C 42 28, 40 22, 40 16 C 40 12, 39 8, 38 8 Z" 
             fill="url(#swiftGradient)"/>
     </g>
   </g>
