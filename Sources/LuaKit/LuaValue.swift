@@ -20,23 +20,23 @@ public enum LuaValue: Equatable, Hashable {
 
     public func push(to L: OpaquePointer) {
         switch self {
-            case .nil:
-                lua_pushnil(L)
-            case .boolean(let value):
-                lua_pushboolean(L, value ? 1 : 0)
-            case .number(let value):
-                lua_pushnumber(L, value)
-            case .string(let value):
-                lua_pushstring(L, value)
-            case .table(let dict):
-                lua_createtable(L, 0, Int32(dict.count))
-                for (key, value) in dict {
-                    lua_pushstring(L, key)
-                    value.push(to: L)
-                    lua_settable(L, -3)
-                }
-            case .function, .userdata, .thread:
-                fatalError("Cannot push \(self) type directly")
+        case .nil:
+            lua_pushnil(L)
+        case .boolean(let value):
+            lua_pushboolean(L, value ? 1 : 0)
+        case .number(let value):
+            lua_pushnumber(L, value)
+        case .string(let value):
+            lua_pushstring(L, value)
+        case .table(let dict):
+            lua_createtable(L, 0, Int32(dict.count))
+            for (key, value) in dict {
+                lua_pushstring(L, key)
+                value.push(to: L)
+                lua_settable(L, -3)
+            }
+        case .function, .userdata, .thread:
+            fatalError("Cannot push \(self) type directly")
         }
     }
 
@@ -48,37 +48,45 @@ public enum LuaValue: Equatable, Hashable {
         let type = lua_type(L, index)
 
         switch type {
-            case LUA_TNIL:
-                return .nil
-            case LUA_TBOOLEAN:
-                return .boolean(lua_toboolean(L, index) != 0)
-            case LUA_TNUMBER:
-                return .number(lua_tonumberx(L, index, nil))
-            case LUA_TSTRING:
-                guard let cStr = lua_tolstring(L, index, nil) else { return nil }
-                return .string(String(cString: cStr))
-            case LUA_TTABLE:
-                var table: [String: LuaValue] = [:]
-
-                lua_pushnil(L)
-                while lua_next(L, index - 1) != 0 {
-                    if let keyStr = lua_tolstring(L, -2, nil),
-                       let value = LuaValue.pull(from: L, at: -1) {
-                        table[String(cString: keyStr)] = value
-                    }
-                    lua_settop(L, -2)
-                }
-
-                return .table(table)
-            case LUA_TFUNCTION:
-                return .function
-            case LUA_TUSERDATA:
-                return .userdata
-            case LUA_TTHREAD:
-                return .thread
-            default:
-                return nil
+        case LUA_TNIL:
+            return .nil
+        case LUA_TBOOLEAN:
+            return .boolean(lua_toboolean(L, index) != 0)
+        case LUA_TNUMBER:
+            return .number(lua_tonumberx(L, index, nil))
+        case LUA_TSTRING:
+            return pullString(from: L, at: index)
+        case LUA_TTABLE:
+            return pullTable(from: L, at: index)
+        case LUA_TFUNCTION:
+            return .function
+        case LUA_TUSERDATA:
+            return .userdata
+        case LUA_TTHREAD:
+            return .thread
+        default:
+            return nil
         }
+    }
+    
+    private static func pullString(from L: OpaquePointer, at index: Int32) -> LuaValue? {
+        guard let cStr = lua_tolstring(L, index, nil) else { return nil }
+        return .string(String(cString: cStr))
+    }
+    
+    private static func pullTable(from L: OpaquePointer, at index: Int32) -> LuaValue? {
+        var table: [String: LuaValue] = [:]
+
+        lua_pushnil(L)
+        while lua_next(L, index - 1) != 0 {
+            if let keyStr = lua_tolstring(L, -2, nil),
+               let value = LuaValue.pull(from: L, at: -1) {
+                table[String(cString: keyStr)] = value
+            }
+            lua_settop(L, -2)
+        }
+
+        return .table(table)
     }
 }
 

@@ -47,7 +47,7 @@ public struct LuaParamMacro: PeerMacro {
     ) throws -> [DeclSyntax] {
         // Extract parameter name and description
         guard case .argumentList(let arguments) = node.arguments,
-              arguments.count >= 2,
+              !arguments.isEmpty && arguments.dropFirst().first != nil,
               let nameArg = arguments.first,
               let descArg = arguments.dropFirst().first,
               let nameLiteral = nameArg.expression.as(StringLiteralExprSyntax.self),
