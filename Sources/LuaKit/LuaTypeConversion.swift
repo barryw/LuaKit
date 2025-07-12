@@ -246,7 +246,7 @@ public struct LuaConvert {
         }
 
         // This is a simplified version - in practice, we'd need more sophisticated type checking
-        if let converter = converterType as? any LuaTypeConverter.Type {
+        if converterType is any LuaTypeConverter.Type {
             // Dynamic dispatch would be needed here
             throw LuaKitError.invalidArgument(
                 LuaErrorContext(

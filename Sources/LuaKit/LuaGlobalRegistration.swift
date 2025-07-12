@@ -119,7 +119,7 @@ public extension LuaState {
 
         // Use reflection to get all cases
         if let caseIterable = enumType as? any CaseIterable.Type {
-            for enumCase in caseIterable.allCases {
+            for enumCase in (caseIterable.allCases as any Collection) {
                 if let value = enumCase as? T {
                     table[value.rawValue] = value.rawValue
                 }
