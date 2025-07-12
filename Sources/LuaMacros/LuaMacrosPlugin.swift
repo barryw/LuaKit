@@ -24,79 +24,78 @@ public struct LuaBridgeableMacro: MemberMacro {
         providingMembersOf declaration: some DeclGroupSyntax,
         in context: some MacroExpansionContext
     ) throws -> [DeclSyntax] {
-        
         guard let classDecl = declaration.as(ClassDeclSyntax.self) else {
             throw MacroError.onlyApplicableToClasses
         }
-        
+
         let className = classDecl.name.text
-        
+
         // Parse the mode parameter from the macro arguments
         let bridgeMode = parseBridgeMode(from: node)
-        
+
         // Extract initializers to generate luaNew method
         let initializers = classDecl.memberBlock.members
             .compactMap { $0.decl.as(InitializerDeclSyntax.self) }
             .filter { $0.modifiers.contains { $0.name.tokenKind == .keyword(.public) } }
-        
+
         // Extract methods to bridge based on mode and attributes
         let allMethods = classDecl.memberBlock.members
             .compactMap { member -> (FunctionDeclSyntax, MemberBlockItemSyntax)? in
                 guard let method = member.decl.as(FunctionDeclSyntax.self) else { return nil }
                 return (method, member)
             }
-        
+
         let bridgedMethods = allMethods
-            .filter { (method, member) in
+            .filter { method, member in
                 let isPublic = method.modifiers.contains { $0.name.tokenKind == .keyword(.public) }
                 guard isPublic else { return false }
-                
+
                 // Exclude property change notification methods
                 let methodName = method.name.text
                 if methodName == "luaPropertyWillChange" || methodName == "luaPropertyDidChange" {
                     return false
                 }
-                
+
                 return shouldBridgeMember(member: member, bridgeMode: bridgeMode)
             }
             .map { $0.0 } // Extract just the method declarations
-        
+
         // Extract properties to bridge based on mode and attributes
         let allProperties = classDecl.memberBlock.members
             .compactMap { member -> (VariableDeclSyntax, MemberBlockItemSyntax)? in
                 guard let property = member.decl.as(VariableDeclSyntax.self) else { return nil }
                 return (property, member)
             }
-        
+
         let bridgedProperties = allProperties
-            .filter { (property, member) in
+            .filter { property, member in
                 let isPublic = property.modifiers.contains { $0.name.tokenKind == .keyword(.public) }
                 guard isPublic else { return false }
-                
+
                 return shouldBridgeMember(member: member, bridgeMode: bridgeMode)
             }
             .map { $0.0 } // Extract just the property declarations
-        
+
         var generatedMembers: [DeclSyntax] = []
-        
+
         // Generate luaNew method
         generatedMembers.append(generateLuaNewMethod(className: className, initializers: initializers))
-        
+
         // Generate registerConstructor method
         generatedMembers.append(generateRegisterConstructorMethod(className: className))
-        
+
         // Generate registerMethods method
         generatedMembers.append(generateRegisterMethodsMethod(className: className, methods: bridgedMethods, properties: bridgedProperties))
-        
+
         return generatedMembers
     }
-    
+
     /// Parse the bridge mode from the macro arguments
     static func parseBridgeMode(from node: AttributeSyntax) -> BridgeMode {
         guard let arguments = node.arguments?.as(LabeledExprListSyntax.self) else {
             return .automatic // Default mode
         }
-        
+
         for argument in arguments {
             if let label = argument.label?.text, label == "mode" {
                 if let memberAccess = argument.expression.as(MemberAccessExprSyntax.self) {
@@ -111,15 +110,15 @@ public struct LuaBridgeableMacro: MemberMacro {
                 }
             }
         }
-        
+
         return .automatic
     }
-    
+
     /// Check if a member should be bridged based on mode and attributes
     static func shouldBridgeMember(member: MemberBlockItemSyntax, bridgeMode: BridgeMode) -> Bool {
         let hasLuaIgnore = hasAttribute(member: member, named: "LuaIgnore")
         let hasLuaOnly = hasAttribute(member: member, named: "LuaOnly")
-        
+
         switch bridgeMode {
             case .automatic:
                 // Bridge by default, unless @LuaIgnore is present
@@ -129,7 +128,7 @@ public struct LuaBridgeableMacro: MemberMacro {
                 return hasLuaOnly
         }
     }
-    
+
     /// Check if a member has a specific attribute
     static func hasAttribute(member: MemberBlockItemSyntax, named attributeName: String) -> Bool {
         // Check function attributes
@@ -141,7 +140,7 @@ public struct LuaBridgeableMacro: MemberMacro {
                 return false
             }
         }
-        
+
         // Check variable attributes
         if let variableDecl = member.decl.as(VariableDeclSyntax.self) {
             return variableDecl.attributes.contains { attribute in
@@ -151,21 +150,21 @@ public struct LuaBridgeableMacro: MemberMacro {
                 return false
             }
         }
-        
+
         return false
     }
     static func generateLuaNewMethod(className: String, initializers: [InitializerDeclSyntax]) -> DeclSyntax {
         // For now, generate a basic luaNew that uses the first initializer
         let parameters = initializers.first?.signature.parameterClause.parameters ?? []
-        
+
         var codeLines: [String] = []
         var initArgs: [String] = []
-        
+
         // Extract parameters and generate Lua parameter extraction code
         for (index, parameter) in parameters.enumerated() {
             let paramName = parameter.firstName.text
             let luaIndex = index + 1
-            
+
             // Type detection for constructor parameters
             if parameter.type.description.contains("Int") {
                 codeLines.append("let \(paramName) = Int(luaL_checkinteger(L, \(luaIndex)))")
@@ -184,7 +183,7 @@ public struct LuaBridgeableMacro: MemberMacro {
                 initArgs.append("\(paramName): \(paramName)")
             }
         }
-        
+
         // Add instance creation and push statements
         let initArgsString = initArgs.joined(separator: ", ")
         codeLines.append("")
@@ -192,41 +191,41 @@ public struct LuaBridgeableMacro: MemberMacro {
         codeLines.append("push(instance, to: L)")
         codeLines.append("")
         codeLines.append("return 1")
-        
+
         let bodyCode = codeLines.joined(separator: "\n    ")
-        
+
         return DeclSyntax(stringLiteral: """
 public static func luaNew(_ L: OpaquePointer) -> Int32 {
     \(bodyCode)
 }
 """)
     }
-    
+
     static func generateRegisterConstructorMethod(className: String) -> DeclSyntax {
         return DeclSyntax(stringLiteral: """
 public static func registerConstructor(_ L: OpaquePointer, name: String) {
     lua_createtable(L, 0, 1)
-    
+
     lua_pushstring(L, "new")
     lua_pushcclosure(L, { L in
         guard let L = L else { return 0 }
         return \(className).luaNew(L)
     }, 0)
     lua_settable(L, -3)
-    
+
     lua_setglobal(L, name)
 }
 """)
     }
-    
+
     static func generateRegisterMethodsMethod(className: String, methods: [FunctionDeclSyntax], properties: [VariableDeclSyntax]) -> DeclSyntax {
         var codeLines: [String] = []
-        
+
         // Generate method registrations
         for method in methods {
             let methodName = method.name.text
             let parameters = method.signature.parameterClause.parameters
-            
+
             codeLines.append("// Register \(methodName) method")
             codeLines.append("lua_pushstring(L, \"\(methodName)\")")
             codeLines.append("lua_pushcclosure(L, { L in")
@@ -235,14 +234,14 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
             codeLines.append("        return luaError(L, \"Invalid \(className) object\")")
             codeLines.append("    }")
             codeLines.append("")
-            
+
             // Generate parameter extraction for method arguments
             var methodArgs: [String] = []
             for (index, parameter) in parameters.enumerated() {
                 let paramName = parameter.secondName?.text ?? parameter.firstName.text
                 let argumentLabel = parameter.firstName.text == "_" ? "" : "\(parameter.firstName.text): "
                 let luaIndex = index + 2 // Start at 2 since 1 is the object itself
-                
+
                 if parameter.type.description.contains("Int") {
                     codeLines.append("    let \(paramName) = Int(luaL_checkinteger(L, \(luaIndex)))")
                     methodArgs.append("\(argumentLabel)\(paramName)")
@@ -262,15 +261,15 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                     methodArgs.append("\(argumentLabel)\(paramName)")
                 }
             }
-            
+
             codeLines.append("")
             let methodArgsString = methodArgs.joined(separator: ", ")
-            
+
             // Check if method has a return type
             if let returnType = method.signature.returnClause?.type.description,
                !returnType.trimmingCharacters(in: .whitespaces).isEmpty && returnType != "Void" {
                 codeLines.append("    let result = obj.\(methodName)(\(methodArgsString))")
-                
+
                 // Handle different return types
                 if returnType.contains("Int") {
                     codeLines.append("    lua_pushinteger(L, lua_Integer(result))")
@@ -294,12 +293,12 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                 codeLines.append("    obj.\(methodName)(\(methodArgsString))")
                 codeLines.append("    return 0")
             }
-            
+
             codeLines.append("}, 0)")
             codeLines.append("lua_settable(L, -3)")
             codeLines.append("")
         }
-        
+
         // Generate property access methods
         if !properties.isEmpty {
             // Generate __index method for property reading
@@ -316,14 +315,14 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
             codeLines.append("    }")
             codeLines.append("")
             codeLines.append("    switch key {")
-            
+
             for property in properties {
                 // Extract property names from binding patterns
                 for binding in property.bindings {
                     if let identPattern = binding.pattern.as(IdentifierPatternSyntax.self) {
                         let propName = identPattern.identifier.text
                         let propType = binding.typeAnnotation?.type.description ?? "Unknown"
-                        
+
                         codeLines.append("    case \"\(propName)\":")
                         // Handle array types first - return proxies instead of arrays
                         if propType.contains("[String]") {
@@ -421,7 +420,7 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                     }
                 }
             }
-            
+
             codeLines.append("    default:")
             codeLines.append("        // Check metatable for methods")
             codeLines.append("        lua_getmetatable(L, 1)")
@@ -432,7 +431,7 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
             codeLines.append("}, 0)")
             codeLines.append("lua_settable(L, -3)")
             codeLines.append("")
-            
+
             // Generate __newindex method for property writing (only for var properties with explicit storage)
             let writableProperties = properties.filter { property in
                 property.bindingSpecifier.tokenKind == .keyword(.var) &&
@@ -440,7 +439,7 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                     binding.accessorBlock == nil // Only stored properties, not computed
                 }
             }
-            
+
             if !writableProperties.isEmpty {
                 codeLines.append("// Register __newindex method for property setting")
                 codeLines.append("lua_pushstring(L, \"__newindex\")")
@@ -455,18 +454,18 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                 codeLines.append("    }")
                 codeLines.append("")
                 codeLines.append("    switch key {")
-                
+
                 for property in writableProperties {
                     for binding in property.bindings {
                         if let identPattern = binding.pattern.as(IdentifierPatternSyntax.self) {
                             let propName = identPattern.identifier.text
                             let propType = binding.typeAnnotation?.type.description ?? "Unknown"
-                            
+
                             codeLines.append("    case \"\(propName)\":")
-                            
+
                             // Get the old value first
                             codeLines.append("        let oldValue = obj.\(propName) as Any?")
-                            
+
                             // Extract the new value based on type
                             // Handle array types first
                             if propType.contains("[String]") {
@@ -564,7 +563,7 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                         }
                     }
                 }
-                
+
                 codeLines.append("    default:")
                 codeLines.append("        return luaError(L, \"Cannot set property \\(key)\")")
                 codeLines.append("    }")
@@ -574,7 +573,7 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                 codeLines.append("")
             }
         }
-        
+
         // Generate __tostring method
         codeLines.append("// Register __tostring method")
         codeLines.append("lua_pushstring(L, \"__tostring\")")
@@ -587,9 +586,9 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
         codeLines.append("    return 1")
         codeLines.append("}, 0)")
         codeLines.append("lua_settable(L, -3)")
-        
+
         let bodyCode = codeLines.joined(separator: "\n    ")
-        
+
         return DeclSyntax(stringLiteral: """
 public static func registerMethods(_ L: OpaquePointer) {
     \(bodyCode)
@@ -642,14 +641,14 @@ public struct LuaPropertyMacro: PeerMacro {
         guard case .argumentList(let arguments) = node.arguments else {
             return []
         }
-        
+
         var isReadOnly = false
         var validatorName: String?
         var minValue: Double?
         var maxValue: Double?
         var regexPattern: String?
         var enumValues: [String] = []
-        
+
         for argument in arguments {
             if let label = argument.label?.text {
                 switch label {
@@ -693,17 +692,17 @@ public struct LuaPropertyMacro: PeerMacro {
                 }
             }
         }
-        
+
         // Get property declaration
         guard let property = declaration.as(VariableDeclSyntax.self),
               let binding = property.bindings.first,
               let identifier = binding.pattern.as(IdentifierPatternSyntax.self) else {
             return []
         }
-        
+
         let propertyName = identifier.identifier.text
         var generatedCode: [DeclSyntax] = []
-        
+
         // Generate validator method if custom validator is specified
         if let validatorName = validatorName {
             let validatorMethod = """
@@ -714,7 +713,7 @@ public struct LuaPropertyMacro: PeerMacro {
             """
             generatedCode.append(DeclSyntax(stringLiteral: validatorMethod))
         }
-        
+
         // Generate property metadata storage
         let metadataProperty = """
         @available(*, deprecated, message: "Property validation metadata")
@@ -728,7 +727,7 @@ public struct LuaPropertyMacro: PeerMacro {
         )
         """
         generatedCode.append(DeclSyntax(stringLiteral: metadataProperty))
-        
+
         return generatedCode
     }
 }
@@ -747,7 +746,7 @@ public struct LuaConstructorMacro: PeerMacro {
 /// Macro expansion errors
 enum MacroError: Error, CustomStringConvertible {
     case onlyApplicableToClasses
-    
+
     var description: String {
         switch self {
             case .onlyApplicableToClasses:
@@ -775,6 +774,6 @@ struct LuaMacrosPlugin: CompilerPlugin {
         LuaChainableMacro.self,
         LuaConvertMacro.self,
         LuaNamespaceMacro.self,
-        LuaRelationshipMacro.self,
+        LuaRelationshipMacro.self
     ]
 }

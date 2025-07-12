@@ -10,10 +10,10 @@ import Lua
 
 public final class LuaState {
     private let L: OpaquePointer
-    
+
     /// Internal access to the Lua state for extensions
     internal var luaState: OpaquePointer { L }
-    
+
     public init() throws {
         guard let state = luaL_newstate() else {
             throw LuaError.memoryAllocation
@@ -23,29 +23,29 @@ public final class LuaState {
         setupPrintCapture()
         registerArrayProxyTypes()
     }
-    
+
     deinit {
         lua_close(L)
     }
-    
+
     private var printOutput: String = ""
     private var printHandler: ((String) -> Void)?
-    
+
     public func setPrintHandler(_ handler: @escaping (String) -> Void) {
         self.printHandler = handler
     }
-    
+
     private func setupPrintCapture() {
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
             let state = LuaState.states[L]
-            
+
             let n = lua_gettop(L)
             var output = ""
-            
+
             for i in 1...n {
                 if i > 1 { output += "\t" }
-                
+
                 if luaL_callmeta(L, i, "__tostring") != 0 {
                     if let str = lua_tolstring(L, -1, nil) {
                         output += String(cString: str)
@@ -76,20 +76,20 @@ public final class LuaState {
                     }
                 }
             }
-            
+
             output += "\n"
             state?.printOutput += output
             state?.printHandler?(output)
-            
+
             return 0
         }, 0)
         lua_setglobal(L, "print")
-        
+
         LuaState.states[L] = self
     }
-    
+
     private static var states: [OpaquePointer: LuaState] = [:]
-    
+
     private func registerArrayProxyTypes() {
         // Register array proxy types for each supported element type
         LuaStringArrayProxy.register(in: self, as: "_StringArrayProxy")
@@ -97,43 +97,43 @@ public final class LuaState {
         LuaDoubleArrayProxy.register(in: self, as: "_DoubleArrayProxy")
         LuaBoolArrayProxy.register(in: self, as: "_BoolArrayProxy")
     }
-    
+
     public func execute(_ code: String) throws -> String {
         printOutput = ""
-        
+
         if luaL_loadstring(L, code) != LUA_OK {
             let error = getError()
             throw LuaError.syntax(error)
         }
-        
+
         if lua_pcallk(L, 0, LUA_MULTRET, 0, 0, nil) != LUA_OK {
             let error = getError()
             throw LuaError.runtime(error)
         }
-        
+
         return printOutput
     }
-    
+
     public func executeReturning<T: LuaConvertible>(_ code: String, as type: T.Type = T.self) throws -> T {
         if luaL_loadstring(L, code) != LUA_OK {
             let error = getError()
             throw LuaError.syntax(error)
         }
-        
+
         if lua_pcallk(L, 0, 1, 0, 0, nil) != LUA_OK {
             let error = getError()
             throw LuaError.runtime(error)
         }
-        
+
         guard let result = T.pull(from: L, at: -1) else {
             lua_settop(L, -2)
             throw LuaError.typeMismatch(expected: String(describing: T.self), got: luaTypeName(at: -1))
         }
-        
+
         lua_settop(L, -2)
         return result
     }
-    
+
     private func getError() -> String {
         if let errorStr = lua_tolstring(L, -1, nil) {
             let error = String(cString: errorStr)
@@ -143,7 +143,7 @@ public final class LuaState {
         lua_settop(L, -2)
         return "Unknown error"
     }
-    
+
     private func luaTypeName(at index: Int32) -> String {
         let type = lua_type(L, index)
         if let name = lua_typename(L, type) {
@@ -151,7 +151,7 @@ public final class LuaState {
         }
         return "unknown"
     }
-    
+
     public func register<T: LuaBridgeable>(_ type: T.Type, as name: String) {
         type.register(in: self, as: name)
     }
@@ -166,7 +166,7 @@ extension Bool: LuaConvertible {
     public static func push(_ value: Bool, to L: OpaquePointer) {
         lua_pushboolean(L, value ? 1 : 0)
     }
-    
+
     public static func pull(from L: OpaquePointer, at index: Int32) -> Bool? {
         guard lua_type(L, index) == LUA_TBOOLEAN else { return nil }
         return lua_toboolean(L, index) != 0
@@ -177,7 +177,7 @@ extension Int: LuaConvertible {
     public static func push(_ value: Int, to L: OpaquePointer) {
         lua_pushinteger(L, lua_Integer(value))
     }
-    
+
     public static func pull(from L: OpaquePointer, at index: Int32) -> Int? {
         guard lua_type(L, index) == LUA_TNUMBER else { return nil }
         return Int(lua_tointegerx(L, index, nil))
@@ -188,7 +188,7 @@ extension Double: LuaConvertible {
     public static func push(_ value: Double, to L: OpaquePointer) {
         lua_pushnumber(L, lua_Number(value))
     }
-    
+
     public static func pull(from L: OpaquePointer, at index: Int32) -> Double? {
         guard lua_type(L, index) == LUA_TNUMBER else { return nil }
         return Double(lua_tonumberx(L, index, nil))
@@ -199,7 +199,7 @@ extension String: LuaConvertible {
     public static func push(_ value: String, to L: OpaquePointer) {
         lua_pushstring(L, value)
     }
-    
+
     public static func pull(from L: OpaquePointer, at index: Int32) -> String? {
         guard let cStr = lua_tolstring(L, index, nil) else { return nil }
         return String(cString: cStr)
@@ -216,21 +216,21 @@ extension Array: LuaConvertible where Element: LuaConvertible {
             lua_rawseti(L, -2, lua_Integer(index + 1))  // Lua arrays are 1-indexed
         }
     }
-    
+
     public static func pull(from L: OpaquePointer, at index: Int32) -> [Element]? {
         guard lua_type(L, index) == LUA_TTABLE else { return nil }
-        
+
         var array: [Element] = []
         let tableIndex = lua_absindex(L, index)
-        
+
         // Get array length
         let len = lua_rawlen(L, tableIndex)
-        
+
         // Handle empty arrays
         if len == 0 {
             return array
         }
-        
+
         for i in 1...len {
             lua_rawgeti(L, tableIndex, lua_Integer(i))
             if let element = Element.pull(from: L, at: -1) {
@@ -242,7 +242,7 @@ extension Array: LuaConvertible where Element: LuaConvertible {
             }
             lua_pop(L, 1)
         }
-        
+
         return array
     }
 }

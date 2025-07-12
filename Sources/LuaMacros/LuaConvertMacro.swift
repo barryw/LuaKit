@@ -5,11 +5,11 @@
 //  Implementation of @LuaConvert for type conversion
 //
 
+import Foundation
 import SwiftCompilerPlugin
 import SwiftSyntax
 import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
-import Foundation
 
 public struct LuaConvertMacro: PeerMacro {
     public static func expansion(
@@ -22,10 +22,10 @@ public struct LuaConvertMacro: PeerMacro {
               arguments.count >= 2 else {
             return []
         }
-        
+
         var fromType: String?
         var converterName: String?
-        
+
         for argument in arguments {
             if let label = argument.label?.text {
                 switch label {
@@ -43,21 +43,21 @@ public struct LuaConvertMacro: PeerMacro {
                 }
             }
         }
-        
+
         // Get parameter declaration
         guard let function = declaration.as(FunctionDeclSyntax.self),
               let fromType = fromType,
               let converterName = converterName else {
             return []
         }
-        
+
         // Store conversion metadata
         let functionName = function.name.text
         let conversionMarker = """
         @available(*, deprecated, message: "Type conversion metadata")
         static let __luaConvert_\(functionName) = (from: "\(fromType)", using: "\(converterName)")
         """
-        
+
         return [DeclSyntax(stringLiteral: conversionMarker)]
     }
 }

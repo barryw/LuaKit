@@ -13,18 +13,18 @@ public class LuaAsyncHandle {
     private let id: UUID
     private var callback: ((Any?, Error?) -> Void)?
     private var isCompleted = false
-    
+
     public init() {
         self.id = UUID()
     }
-    
+
     public func complete(result: Any?, error: Error?) {
         guard !isCompleted else { return }
         isCompleted = true
         callback?(result, error)
         callback = nil
     }
-    
+
     public func onComplete(_ callback: @escaping (Any?, Error?) -> Void) {
         if isCompleted {
             // Already completed, call immediately
@@ -38,17 +38,17 @@ public class LuaAsyncHandle {
 /// Registry for active async operations
 public class LuaAsyncRegistry {
     private static var activeHandles: [UUID: LuaAsyncHandle] = [:]
-    
+
     public static func register(_ handle: LuaAsyncHandle) -> UUID {
         let id = UUID()
         activeHandles[id] = handle
         return id
     }
-    
+
     public static func get(_ id: UUID) -> LuaAsyncHandle? {
         return activeHandles[id]
     }
-    
+
     public static func remove(_ id: UUID) {
         activeHandles.removeValue(forKey: id)
     }
@@ -64,13 +64,13 @@ extension LuaState {
             let id = LuaAsyncRegistry.register(handle)
             return id.uuidString
         }
-        
+
         registerFunction("completeAsync") { (handleId: String, result: String?, error: String?) in
             guard let uuid = UUID(uuidString: handleId),
                   let handle = LuaAsyncRegistry.get(uuid) else {
                 return
             }
-            
+
             let err = error.map { NSError(domain: "LuaAsync", code: 0, userInfo: [NSLocalizedDescriptionKey: $0]) }
             handle.complete(result: result, error: err)
             LuaAsyncRegistry.remove(uuid)

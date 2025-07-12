@@ -17,7 +17,7 @@ public enum LuaValue: Equatable, Hashable {
     case function
     case userdata
     case thread
-    
+
     public func push(to L: OpaquePointer) {
         switch self {
             case .nil:
@@ -39,14 +39,14 @@ public enum LuaValue: Equatable, Hashable {
                 fatalError("Cannot push \(self) type directly")
         }
     }
-    
+
     public static func extract(from L: OpaquePointer, at index: Int32) -> LuaValue? {
         return pull(from: L, at: index)
     }
-    
+
     public static func pull(from L: OpaquePointer, at index: Int32) -> LuaValue? {
         let type = lua_type(L, index)
-        
+
         switch type {
             case LUA_TNIL:
                 return .nil
@@ -59,7 +59,7 @@ public enum LuaValue: Equatable, Hashable {
                 return .string(String(cString: cStr))
             case LUA_TTABLE:
                 var table: [String: LuaValue] = [:]
-                
+
                 lua_pushnil(L)
                 while lua_next(L, index - 1) != 0 {
                     if let keyStr = lua_tolstring(L, -2, nil),
@@ -68,7 +68,7 @@ public enum LuaValue: Equatable, Hashable {
                     }
                     lua_settop(L, -2)
                 }
-                
+
                 return .table(table)
             case LUA_TFUNCTION:
                 return .function
@@ -86,7 +86,6 @@ extension LuaValue: LuaConvertible {
     public static func push(_ value: LuaValue, to L: OpaquePointer) {
         value.push(to: L)
     }
-    
 }
 
 extension LuaValue: ExpressibleByNilLiteral {

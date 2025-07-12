@@ -9,7 +9,7 @@ import Foundation
 import Lua
 
 // Lua constants that are defined as macros and not available in Swift
-public let LUA_REGISTRYINDEX: Int32 = -1001000  // -LUAI_MAXSTACK - 1000, where LUAI_MAXSTACK = 1000000
+public let luaRegistryIndex: Int32 = -1_001_000  // -LUAI_MAXSTACK - 1000, where LUAI_MAXSTACK = 1000000
 
 // Helper functions for macros
 public func lua_pop(_ L: OpaquePointer, _ n: Int32) {
@@ -36,8 +36,8 @@ public func lua_pcall(_ L: OpaquePointer, _ nargs: Int32, _ nresults: Int32, _ e
     return lua_pcallk(L, nargs, nresults, errfunc, 0, nil)
 }
 
-public func luaL_getmetatable(_ L: OpaquePointer, _ name: String) {
-    lua_getfield(L, LUA_REGISTRYINDEX, name)
+public func luaGetMetatable(_ L: OpaquePointer, _ name: String) {
+    lua_getfield(L, luaRegistryIndex, name)
 }
 
 public func luaError(_ L: OpaquePointer, _ message: String) -> Int32 {

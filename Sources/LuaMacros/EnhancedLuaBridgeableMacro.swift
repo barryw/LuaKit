@@ -5,21 +5,20 @@
 //  Enhanced implementation of @LuaBridgeable with support for different return types
 //
 
+import Foundation
 import SwiftCompilerPlugin
 import SwiftSyntax
 import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
-import Foundation
 
 public struct EnhancedLuaBridgeableMacro: MemberMacro, ExtensionMacro {
-    
     // MARK: - Enhanced Type Detection
-    
+
     private static func detectReturnType(_ returnClause: ReturnClauseSyntax?) -> String {
         guard let returnType = returnClause?.type else { return "Void" }
         return returnType.trimmedDescription
     }
-    
+
     private static func generateReturnTypePush(_ returnType: String, indent: String) -> String {
         // Handle optional types
         if returnType.hasSuffix("?") {
@@ -32,7 +31,7 @@ public struct EnhancedLuaBridgeableMacro: MemberMacro, ExtensionMacro {
             \(indent)}
             """
         }
-        
+
         // Handle array types
         if returnType.hasPrefix("[") && returnType.hasSuffix("]") {
             let elementType = String(returnType.dropFirst().dropLast())
@@ -41,12 +40,12 @@ public struct EnhancedLuaBridgeableMacro: MemberMacro, ExtensionMacro {
             }
             return "// TODO: Handle array of \(elementType)"
         }
-        
+
         // Handle dictionary types
         if returnType.hasPrefix("[") && returnType.contains(":") {
             return "// TODO: Handle dictionary type \(returnType)"
         }
-        
+
         // Handle basic types
         switch returnType {
         case "Void":
@@ -88,13 +87,13 @@ public struct EnhancedLuaBridgeableMacro: MemberMacro, ExtensionMacro {
             }
         }
     }
-    
+
     private static func generateReturnCount(_ returnType: String) -> String {
         return returnType == "Void" ? "0" : "1"
     }
-    
+
     // MARK: - Enhanced Method Generation
-    
+
     private static func generateMethodRegistration(
         _ method: FunctionDeclSyntax,
         className: String,
@@ -103,20 +102,20 @@ public struct EnhancedLuaBridgeableMacro: MemberMacro, ExtensionMacro {
         let methodName = method.name.text
         let params = method.signature.parameterClause.parameters
         let returnType = detectReturnType(method.signature.returnClause)
-        
+
         var codeLines: [String] = []
-        
+
         // Method registration
         codeLines.append("lua_pushstring(L, \"\(methodName)\")")
         codeLines.append("lua_pushcclosure(L, { L in")
         codeLines.append("    guard let L = L else { return 0 }")
-        
+
         // Debug logging
         if isDebugMode {
             codeLines.append("    let debugContext = LuaMethodDebugContext(className: \"\(className)\", methodName: \"\(methodName)\")")
             codeLines.append("    debugContext.logEntry()")
         }
-        
+
         // Error handling setup
         codeLines.append("    ")
         codeLines.append("    // Get self")
@@ -124,16 +123,16 @@ public struct EnhancedLuaBridgeableMacro: MemberMacro, ExtensionMacro {
         codeLines.append("        return luaDetailedError(L, functionName: \"\(className):\(methodName)\", argumentIndex: 1, expectedType: \"\(className)\", actualType: L.luaTypeName(at: 1))")
         codeLines.append("    }")
         codeLines.append("    ")
-        
+
         // Parameter extraction with enhanced error messages
         var parameterExtractions: [String] = []
         var methodCallParams: [String] = []
         var argIndex = 2
-        
+
         for param in params {
             let paramName = param.firstName.text
             let paramType = param.type.description.trimmingCharacters(in: .whitespaces)
-                
+
             // Generate parameter extraction with detailed errors
             let extraction = generateParameterExtraction(
                 paramName: paramName,
@@ -141,48 +140,48 @@ public struct EnhancedLuaBridgeableMacro: MemberMacro, ExtensionMacro {
                 argIndex: argIndex,
                 methodName: "\(className):\(methodName)"
             )
-            
+
             parameterExtractions.append(extraction)
             methodCallParams.append(paramName == "_" ? "param\(argIndex - 1)" : "\(paramName): param\(argIndex - 1)")
             argIndex += 1
         }
-        
+
         // Add parameter extractions
         codeLines.append(contentsOf: parameterExtractions)
-        
+
         // Method call
-        let methodCall = methodCallParams.isEmpty ? 
-            "obj.\(methodName)()" : 
+        let methodCall = methodCallParams.isEmpty ?
+            "obj.\(methodName)()" :
             "obj.\(methodName)(\(methodCallParams.joined(separator: ", ")))"
-        
+
         if returnType != "Void" {
             codeLines.append("    let result = \(methodCall)")
-            
+
             if isDebugMode {
                 codeLines.append("    debugContext.logExit(result: String(describing: result))")
             }
-            
+
             // Push result with proper type handling
             let pushCode = generateReturnTypePush(returnType, indent: "    ")
             codeLines.append("    \(pushCode)")
             codeLines.append("    return \(generateReturnCount(returnType))")
         } else {
             codeLines.append("    \(methodCall)")
-            
+
             if isDebugMode {
                 codeLines.append("    debugContext.logExit()")
             }
-            
+
             codeLines.append("    return 0")
         }
-        
+
         codeLines.append("}, 0)")
         codeLines.append("lua_settable(L, -3)")
         codeLines.append("")
-        
+
         return codeLines.joined(separator: "\n        ")
     }
-    
+
     private static func generateParameterExtraction(
         paramName: String,
         paramType: String,
@@ -190,7 +189,7 @@ public struct EnhancedLuaBridgeableMacro: MemberMacro, ExtensionMacro {
         methodName: String
     ) -> String {
         let varName = paramName == "_" ? "param\(argIndex - 1)" : "param\(argIndex - 1)"
-        
+
         // Handle optional parameters
         if paramType.hasSuffix("?") {
             let baseType = String(paramType.dropLast())
@@ -204,10 +203,10 @@ public struct EnhancedLuaBridgeableMacro: MemberMacro, ExtensionMacro {
                 }
             """
         }
-        
+
         return generateNonOptionalExtraction(paramType, varName: varName, argIndex: argIndex, methodName: methodName, paramName: paramName)
     }
-    
+
     private static func generateNonOptionalExtraction(
         _ paramType: String,
         varName: String,
@@ -223,7 +222,7 @@ public struct EnhancedLuaBridgeableMacro: MemberMacro, ExtensionMacro {
                 }
                 let \(varName) = Int(lua_tointegerx(L, \(argIndex), nil))
             """
-            
+
         case "Double":
             return """
                 guard lua_type(L, \(argIndex)) == LUA_TNUMBER else {
@@ -231,7 +230,7 @@ public struct EnhancedLuaBridgeableMacro: MemberMacro, ExtensionMacro {
                 }
                 let \(varName) = lua_tonumberx(L, \(argIndex), nil)
             """
-            
+
         case "Float":
             return """
                 guard lua_type(L, \(argIndex)) == LUA_TNUMBER else {
@@ -239,7 +238,7 @@ public struct EnhancedLuaBridgeableMacro: MemberMacro, ExtensionMacro {
                 }
                 let \(varName) = Float(lua_tonumberx(L, \(argIndex), nil))
             """
-            
+
         case "String":
             return """
                 guard let \(varName)Ptr = lua_tolstring(L, \(argIndex), nil) else {
@@ -247,7 +246,7 @@ public struct EnhancedLuaBridgeableMacro: MemberMacro, ExtensionMacro {
                 }
                 let \(varName) = String(cString: \(varName)Ptr)
             """
-            
+
         case "Bool":
             return """
                 guard lua_type(L, \(argIndex)) == LUA_TBOOLEAN else {
@@ -255,7 +254,7 @@ public struct EnhancedLuaBridgeableMacro: MemberMacro, ExtensionMacro {
                 }
                 let \(varName) = lua_toboolean(L, \(argIndex)) != 0
             """
-            
+
         default:
             // Try LuaConvertible types
             return """
@@ -265,9 +264,9 @@ public struct EnhancedLuaBridgeableMacro: MemberMacro, ExtensionMacro {
             """
         }
     }
-    
+
     // MARK: - MemberMacro Implementation
-    
+
     public static func expansion(
         of node: AttributeSyntax,
         providingMembersOf declaration: some DeclGroupSyntax,
@@ -283,10 +282,10 @@ public struct EnhancedLuaBridgeableMacro: MemberMacro, ExtensionMacro {
                 }
             }
         }
-        
+
         // Generate members
         var members: [DeclSyntax] = []
-        
+
         // Add debug property if needed
         if isDebugMode {
             let debugProperty = """
@@ -294,15 +293,15 @@ public struct EnhancedLuaBridgeableMacro: MemberMacro, ExtensionMacro {
             """
             members.append(DeclSyntax(stringLiteral: debugProperty))
         }
-        
+
         // Generate the standard LuaBridgeable methods with enhancements
         // (Similar to original but with enhanced type support)
-        
+
         return members
     }
-    
+
     // MARK: - ExtensionMacro Implementation
-    
+
     public static func expansion(
         of node: AttributeSyntax,
         attachedTo declaration: some DeclGroupSyntax,
@@ -320,13 +319,13 @@ public struct EnhancedLuaBridgeableMacro: MemberMacro, ExtensionMacro {
                 }
             }
         }
-        
+
         // Create conformances
         var conformances = "LuaBridgeable"
         if isDebugMode {
             conformances += ", LuaDebuggable"
         }
-        
+
         let extensionDecl = try ExtensionDeclSyntax("extension \(type): \(raw: conformances) {}")
         return [extensionDecl]
     }

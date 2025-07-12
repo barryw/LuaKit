@@ -5,11 +5,11 @@
 //  Implementation of @LuaFactory for factory method support
 //
 
+import Foundation
 import SwiftCompilerPlugin
 import SwiftSyntax
 import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
-import Foundation
 
 public struct LuaFactoryMacro: PeerMacro {
     public static func expansion(
@@ -21,20 +21,20 @@ public struct LuaFactoryMacro: PeerMacro {
         guard let method = declaration.as(FunctionDeclSyntax.self) else {
             return []
         }
-        
+
         // Generate a static wrapper if the method isn't already static
         let isStatic = method.modifiers.contains { $0.name.tokenKind == .keyword(.static) }
-        
+
         if !isStatic {
             // Generate documentation comment
             let docComment = """
             /// Factory method wrapper for Lua
             /// This method is automatically exposed as a static factory method in Lua
             """
-            
+
             return [DeclSyntax(stringLiteral: docComment)]
         }
-        
+
         return []
     }
 }

@@ -5,11 +5,11 @@
 //  Implementation of @LuaDoc for documentation support
 //
 
+import Foundation
 import SwiftCompilerPlugin
 import SwiftSyntax
 import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
-import Foundation
 
 public struct LuaDocMacro: PeerMacro {
     public static func expansion(
@@ -24,7 +24,7 @@ public struct LuaDocMacro: PeerMacro {
               let docString = stringLiteral.segments.first?.as(StringSegmentSyntax.self)?.content.text else {
             return []
         }
-        
+
         // Store documentation in a static property
         if let method = declaration.as(FunctionDeclSyntax.self) {
             let methodName = method.name.text
@@ -34,7 +34,7 @@ public struct LuaDocMacro: PeerMacro {
             """
             return [DeclSyntax(stringLiteral: docProperty)]
         }
-        
+
         return []
     }
 }
@@ -56,7 +56,7 @@ public struct LuaParamMacro: PeerMacro {
               let paramDesc = descLiteral.segments.first?.as(StringSegmentSyntax.self)?.content.text else {
             return []
         }
-        
+
         // Store parameter documentation
         if let method = declaration.as(FunctionDeclSyntax.self) {
             let methodName = method.name.text
@@ -66,7 +66,7 @@ public struct LuaParamMacro: PeerMacro {
             """
             return [DeclSyntax(stringLiteral: paramProperty)]
         }
-        
+
         return []
     }
 }

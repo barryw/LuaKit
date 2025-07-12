@@ -5,11 +5,11 @@
 //  Implementation of @LuaCollection for automatic collection methods
 //
 
+import Foundation
 import SwiftCompilerPlugin
 import SwiftSyntax
 import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
-import Foundation
 
 public struct LuaCollectionMacro: PeerMacro {
     public static func expansion(
@@ -24,7 +24,7 @@ public struct LuaCollectionMacro: PeerMacro {
               let collectionName = stringLiteral.segments.first?.as(StringSegmentSyntax.self)?.content.text else {
             return []
         }
-        
+
         // Get property declaration
         guard let property = declaration.as(VariableDeclSyntax.self),
               let binding = property.bindings.first,
@@ -32,20 +32,20 @@ public struct LuaCollectionMacro: PeerMacro {
               let typeAnnotation = binding.typeAnnotation?.type else {
             return []
         }
-        
+
         let propertyName = identifier.identifier.text
         let typeString = typeAnnotation.description.trimmingCharacters(in: .whitespaces)
-        
+
         // Extract element type from array type
         guard typeString.hasPrefix("[") && typeString.hasSuffix("]") else {
             return []
         }
-        
+
         let elementType = String(typeString.dropFirst().dropLast())
-        
+
         // Generate collection methods
         var methods: [DeclSyntax] = []
-        
+
         // Add method
         let addMethod = """
         public func add\(collectionName.capitalized)(_ item: \(elementType)) {
@@ -53,7 +53,7 @@ public struct LuaCollectionMacro: PeerMacro {
         }
         """
         methods.append(DeclSyntax(stringLiteral: addMethod))
-        
+
         // Remove method
         let removeMethod = """
         public func remove\(collectionName.capitalized)(_ item: \(elementType)) {
@@ -63,7 +63,7 @@ public struct LuaCollectionMacro: PeerMacro {
         }
         """
         methods.append(DeclSyntax(stringLiteral: removeMethod))
-        
+
         // Get at index method
         let getMethod = """
         public func get\(collectionName.capitalized)At(_ index: Int) -> \(elementType)? {
@@ -72,7 +72,7 @@ public struct LuaCollectionMacro: PeerMacro {
         }
         """
         methods.append(DeclSyntax(stringLiteral: getMethod))
-        
+
         // Count method
         let countMethod = """
         public func get\(collectionName.capitalized)Count() -> Int {
@@ -80,7 +80,7 @@ public struct LuaCollectionMacro: PeerMacro {
         }
         """
         methods.append(DeclSyntax(stringLiteral: countMethod))
-        
+
         // Clear method
         let clearMethod = """
         public func clear\(collectionName.capitalized)() {
@@ -88,7 +88,7 @@ public struct LuaCollectionMacro: PeerMacro {
         }
         """
         methods.append(DeclSyntax(stringLiteral: clearMethod))
-        
+
         return methods
     }
 }

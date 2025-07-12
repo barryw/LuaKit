@@ -5,11 +5,11 @@
 //  Implementation of @LuaNamespace for namespace support
 //
 
+import Foundation
 import SwiftCompilerPlugin
 import SwiftSyntax
 import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
-import Foundation
 
 public struct LuaNamespaceMacro: MemberMacro {
     public static func expansion(
@@ -24,7 +24,7 @@ public struct LuaNamespaceMacro: MemberMacro {
               let namespaceName = stringLiteral.segments.first?.as(StringSegmentSyntax.self)?.content.text else {
             return []
         }
-        
+
         // Get type name
         let _: String
         if let classDecl = declaration.as(ClassDeclSyntax.self) {
@@ -34,7 +34,7 @@ public struct LuaNamespaceMacro: MemberMacro {
         } else {
             return []
         }
-        
+
         // Generate namespace registration method
         let registrationMethod = """
         public static func registerInNamespace(_ L: OpaquePointer, namespace: String = "\(namespaceName)") {
@@ -46,18 +46,18 @@ public struct LuaNamespaceMacro: MemberMacro {
                 lua_pushvalue(L, -1)
                 lua_setglobal(L, namespace)
             }
-            
+
             // Register all static methods in the namespace
             registerStaticMethods(L)
-            
+
             lua_pop(L, 1) // Pop namespace table
         }
-        
+
         private static func registerStaticMethods(_ L: OpaquePointer) {
             // This will be filled in by the macro expansion with actual static methods
         }
         """
-        
+
         return [DeclSyntax(stringLiteral: registrationMethod)]
     }
 }

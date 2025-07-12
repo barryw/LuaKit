@@ -5,11 +5,11 @@
 //  Implementation of @LuaRelationship for relationship management
 //
 
+import Foundation
 import SwiftCompilerPlugin
 import SwiftSyntax
 import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
-import Foundation
 
 public struct LuaRelationshipMacro: PeerMacro {
     public static func expansion(
@@ -21,11 +21,11 @@ public struct LuaRelationshipMacro: PeerMacro {
         guard case .argumentList(let arguments) = node.arguments else {
             return []
         }
-        
+
         var relationshipType: String?
         var inverseName: String?
         var cascadeType: String = "none"
-        
+
         for argument in arguments {
             if let label = argument.label?.text {
                 switch label {
@@ -47,7 +47,7 @@ public struct LuaRelationshipMacro: PeerMacro {
                 }
             }
         }
-        
+
         // Get property declaration
         guard let property = declaration.as(VariableDeclSyntax.self),
               let binding = property.bindings.first,
@@ -55,12 +55,12 @@ public struct LuaRelationshipMacro: PeerMacro {
               let relationshipType = relationshipType else {
             return []
         }
-        
+
         let propertyName = identifier.identifier.text
-        
+
         // Generate relationship management methods
         var methods: [DeclSyntax] = []
-        
+
         // Cascade delete support
         if cascadeType == "delete" {
             let cascadeMethod = """
@@ -71,14 +71,14 @@ public struct LuaRelationshipMacro: PeerMacro {
             """
             methods.append(DeclSyntax(stringLiteral: cascadeMethod))
         }
-        
+
         // Store relationship metadata
         let metadataProperty = """
         @available(*, deprecated, message: "Relationship metadata")
         static let __luaRelationship_\(propertyName) = (type: "\(relationshipType)", inverse: "\(inverseName ?? "")", cascade: "\(cascadeType)")
         """
         methods.append(DeclSyntax(stringLiteral: metadataProperty))
-        
+
         return methods
     }
 }

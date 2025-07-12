@@ -16,7 +16,7 @@ public struct LuaErrorContext {
     public let actualType: String
     public let additionalInfo: String?
     public let hint: String?
-    
+
     public init(
         functionName: String,
         argumentIndex: Int? = nil,
@@ -32,28 +32,28 @@ public struct LuaErrorContext {
         self.additionalInfo = additionalInfo
         self.hint = hint
     }
-    
+
     /// Generates a detailed error message
     public func generateMessage() -> String {
         var message = "Error"
-        
+
         if let index = argumentIndex {
             message += ": Invalid argument #\(index) to '\(functionName)'"
         } else {
             message += " in '\(functionName)'"
         }
-        
+
         message += "\nExpected: \(expectedType)"
         message += "\nGot: \(actualType)"
-        
+
         if let info = additionalInfo {
             message += "\n\(info)"
         }
-        
+
         if let hint = hint {
             message += "\n\nHint: \(hint)"
         }
-        
+
         return message
     }
 }
@@ -66,26 +66,26 @@ public enum LuaKitError: Error, CustomStringConvertible {
     case validationFailed(property: String, value: Any, reason: String)
     case enumConversionFailed(type: String, value: String, validValues: [String])
     case asyncOperationFailed(function: String, reason: String)
-    
+
     public var description: String {
         switch self {
         case .invalidArgument(let context):
             return context.generateMessage()
-            
-        case .invalidReturnType(let expected, let got, let function):
+
+        case let .invalidReturnType(expected, got, function):
             return "Error: Invalid return type from '\(function)'\nExpected: \(expected)\nGot: \(got)"
-            
-        case .missingRequiredParameter(let parameter, let function):
+
+        case let .missingRequiredParameter(parameter, function):
             return "Error: Missing required parameter '\(parameter)' for function '\(function)'"
-            
-        case .validationFailed(let property, let value, let reason):
+
+        case let .validationFailed(property, value, reason):
             return "Error: Validation failed for property '\(property)'\nValue: \(value)\nReason: \(reason)"
-            
-        case .enumConversionFailed(let type, let value, let validValues):
+
+        case let .enumConversionFailed(type, value, validValues):
             let validList = validValues.joined(separator: ", ")
             return "Error: Invalid value '\(value)' for enum type '\(type)'\nValid values: \(validList)"
-            
-        case .asyncOperationFailed(let function, let reason):
+
+        case let .asyncOperationFailed(function, reason):
             return "Error: Async operation '\(function)' failed\nReason: \(reason)"
         }
     }
@@ -130,25 +130,25 @@ public extension OpaquePointer {
             return "unknown"
         }
     }
-    
+
     /// Get the metatable name if it exists
     private func getMetatableName(at index: Int32) -> String? {
         guard lua_getmetatable(self, index) != 0 else { return nil }
         defer { lua_pop(self, 1) } // Pop metatable
-        
+
         lua_pushstring(self, "__name")
         lua_rawget(self, -2)
-        
+
         if let name = lua_tostring(self, -1) {
             let result = String(cString: name)
             lua_pop(self, 1) // Pop name
             return result
         }
-        
+
         lua_pop(self, 1) // Pop nil
         return nil
     }
-    
+
     /// Get descriptive value representation
     func luaValueDescription(at index: Int32) -> String {
         let type = lua_type(self, index)
@@ -194,7 +194,7 @@ public func luaDetailedError(
         }
         return "unknown"
     }()
-    
+
     let context = LuaErrorContext(
         functionName: functionName,
         argumentIndex: argumentIndex,
@@ -203,7 +203,7 @@ public func luaDetailedError(
         additionalInfo: additionalInfo,
         hint: hint
     )
-    
+
     lua_pushstring(L, context.generateMessage())
     return lua_error(L)
 }
@@ -220,7 +220,7 @@ public func validateLuaType(
     if expectedTypes.contains(actualType) {
         return true
     }
-    
+
     let expectedTypeNames = expectedTypes.map { type in
         switch type {
         case LUA_TNIL: return "nil"
@@ -233,12 +233,12 @@ public func validateLuaType(
         default: return "unknown"
         }
     }.joined(separator: " or ")
-    
+
     let actualTypeName = L.luaTypeName(at: index)
     let actualValue = L.luaValueDescription(at: index)
-    
+
     let paramInfo = parameterName.map { "parameter '\($0)'" } ?? "argument #\(index)"
-    
+
     _ = luaDetailedError(
         L,
         functionName: functionName,
@@ -247,6 +247,6 @@ public func validateLuaType(
         actualType: "\(actualTypeName) (\(actualValue))",
         additionalInfo: "Invalid \(paramInfo)"
     )
-    
+
     return false
 }

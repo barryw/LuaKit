@@ -15,7 +15,7 @@ public class LuaArrayProxy<Element: LuaConvertible> {
     private let getter: () -> [Element]
     private let setter: ([Element]) -> Void
     private let validator: (([Element]) -> Result<Void, PropertyValidationError>)?
-    
+
     public init(owner: AnyObject,
                 propertyName: String,
                 getter: @escaping () -> [Element],
@@ -27,28 +27,28 @@ public class LuaArrayProxy<Element: LuaConvertible> {
         self.setter = setter
         self.validator = validator
     }
-    
+
     // MARK: - Array Access Methods
-    
+
     func getElement(at index: Int) -> Element? {
         let array = getter()
         guard index > 0 && index <= array.count else { return nil }
         return array[index - 1]  // Convert from Lua 1-based to Swift 0-based
     }
-    
+
     func setElement(at index: Int, to value: Element) throws {
         var array = getter()
-        
+
         // Bounds checking
         guard index > 0 else {
             throw PropertyValidationError("Array index must be positive, got \(index)")
         }
-        
+
         // Allow setting one past the end (appending)
         if index > array.count + 1 {
             throw PropertyValidationError("Array index \(index) out of bounds (size: \(array.count))")
         }
-        
+
         // Prepare the new array
         let oldArray = array
         if index == array.count + 1 {
@@ -56,7 +56,7 @@ public class LuaArrayProxy<Element: LuaConvertible> {
         } else {
             array[index - 1] = value
         }
-        
+
         // Validate if needed
         if let validator = validator {
             switch validator(array) {
@@ -66,26 +66,26 @@ public class LuaArrayProxy<Element: LuaConvertible> {
                 throw error
             }
         }
-        
+
         // Apply the change
         setter(array)
-        
+
         // Notify owner of change if it implements property change notifications
         if let bridgeable = owner as? LuaBridgeable {
             bridgeable.luaPropertyDidChange(propertyName, from: oldArray as Any, to: array as Any)
         }
     }
-    
+
     func getLength() -> Int {
         return getter().count
     }
-    
+
     func toArray() -> [Element] {
         return getter()
     }
-    
+
     // MARK: - Shared Implementation
-    
+
     public var description: String {
         let array = getter()
         return "LuaArrayProxy<\(Element.self)>(\(propertyName): \(array.count) elements)"
@@ -99,22 +99,22 @@ public final class LuaStringArrayProxy: LuaArrayProxy<String>, LuaBridgeable {
         // Array proxies are not directly constructible from Lua
         return luaError(L, "LuaStringArrayProxy cannot be constructed directly")
     }
-    
+
     public static func registerConstructor(_ L: OpaquePointer, name: String) {
         // No constructor needed
     }
-    
+
     public static func registerMethods(_ L: OpaquePointer) {
         // __index metamethod for element access
         lua_pushstring(L, "__index")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
-            
+
             // Get the proxy object
             guard let proxy = LuaStringArrayProxy.checkUserdata(L, at: 1) else {
                 return luaError(L, "Invalid array proxy")
             }
-            
+
             // Check if key is a number (array index)
             if lua_type(L, 2) == LUA_TNUMBER {
                 let index = Int(lua_tointeger(L, 2))
@@ -126,7 +126,7 @@ public final class LuaStringArrayProxy: LuaArrayProxy<String>, LuaBridgeable {
                     return 1
                 }
             }
-            
+
             // Check for special methods
             if let key = String.pull(from: L, at: 2) {
                 switch key {
@@ -142,34 +142,34 @@ public final class LuaStringArrayProxy: LuaArrayProxy<String>, LuaBridgeable {
                     return 1
                 }
             }
-            
+
             lua_pushnil(L)
             return 1
         }, 0)
         lua_settable(L, -3)
-        
+
         // __newindex metamethod for element assignment
         lua_pushstring(L, "__newindex")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
-            
+
             // Get the proxy object
             guard let proxy = LuaStringArrayProxy.checkUserdata(L, at: 1) else {
                 return luaError(L, "Invalid array proxy")
             }
-            
+
             // Index must be a number
             guard lua_type(L, 2) == LUA_TNUMBER else {
                 return luaError(L, "Array index must be a number")
             }
-            
+
             let index = Int(lua_tointeger(L, 2))
-            
+
             // Get the new value
             guard let newValue = String.pull(from: L, at: 3) else {
                 return luaError(L, "Invalid value type for array element")
             }
-            
+
             // Set the element
             do {
                 try proxy.setElement(at: index, to: newValue)
@@ -178,11 +178,11 @@ public final class LuaStringArrayProxy: LuaArrayProxy<String>, LuaBridgeable {
             } catch {
                 return luaError(L, "Failed to set array element: \(error)")
             }
-            
+
             return 0
         }, 0)
         lua_settable(L, -3)
-        
+
         // __len metamethod for # operator
         lua_pushstring(L, "__len")
         lua_pushcclosure(L, { L in
@@ -194,25 +194,25 @@ public final class LuaStringArrayProxy: LuaArrayProxy<String>, LuaBridgeable {
             return 1
         }, 0)
         lua_settable(L, -3)
-        
+
         // __ipairs metamethod for iteration
         lua_pushstring(L, "__ipairs")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
-            
+
             // Push iterator function
             lua_pushcclosure(L, { L in
                 guard let L = L else { return 0 }
-                
+
                 // Get the proxy (first upvalue of ipairs)
                 guard let proxy = LuaStringArrayProxy.checkUserdata(L, at: 1) else {
                     return luaError(L, "Invalid array proxy")
                 }
-                
+
                 // Get current index
                 let currentIndex = Int(lua_tointeger(L, 2))
                 let nextIndex = currentIndex + 1
-                
+
                 // Check if we have more elements
                 if let element = proxy.getElement(at: nextIndex) {
                     lua_pushinteger(L, lua_Integer(nextIndex))
@@ -223,17 +223,17 @@ public final class LuaStringArrayProxy: LuaArrayProxy<String>, LuaBridgeable {
                     return 1
                 }
             }, 0)
-            
+
             // Push the proxy object (state)
             lua_pushvalue(L, 1)
-            
+
             // Push initial index (0)
             lua_pushinteger(L, 0)
-            
+
             return 3
         }, 0)
         lua_settable(L, -3)
-        
+
         // __tostring metamethod
         lua_pushstring(L, "__tostring")
         lua_pushcclosure(L, { L in
@@ -258,22 +258,22 @@ public final class LuaIntArrayProxy: LuaArrayProxy<Int>, LuaBridgeable {
         // Array proxies are not directly constructible from Lua
         return luaError(L, "LuaIntArrayProxy cannot be constructed directly")
     }
-    
+
     public static func registerConstructor(_ L: OpaquePointer, name: String) {
         // No constructor needed
     }
-    
+
     public static func registerMethods(_ L: OpaquePointer) {
         // __index metamethod for element access
         lua_pushstring(L, "__index")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
-            
+
             // Get the proxy object
             guard let proxy = LuaIntArrayProxy.checkUserdata(L, at: 1) else {
                 return luaError(L, "Invalid array proxy")
             }
-            
+
             // Check if key is a number (array index)
             if lua_type(L, 2) == LUA_TNUMBER {
                 let index = Int(lua_tointeger(L, 2))
@@ -285,7 +285,7 @@ public final class LuaIntArrayProxy: LuaArrayProxy<Int>, LuaBridgeable {
                     return 1
                 }
             }
-            
+
             // Check for special methods
             if let key = String.pull(from: L, at: 2) {
                 switch key {
@@ -301,34 +301,34 @@ public final class LuaIntArrayProxy: LuaArrayProxy<Int>, LuaBridgeable {
                     return 1
                 }
             }
-            
+
             lua_pushnil(L)
             return 1
         }, 0)
         lua_settable(L, -3)
-        
+
         // __newindex metamethod for element assignment
         lua_pushstring(L, "__newindex")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
-            
+
             // Get the proxy object
             guard let proxy = LuaIntArrayProxy.checkUserdata(L, at: 1) else {
                 return luaError(L, "Invalid array proxy")
             }
-            
+
             // Index must be a number
             guard lua_type(L, 2) == LUA_TNUMBER else {
                 return luaError(L, "Array index must be a number")
             }
-            
+
             let index = Int(lua_tointeger(L, 2))
-            
+
             // Get the new value
             guard let newValue = Int.pull(from: L, at: 3) else {
                 return luaError(L, "Invalid value type for array element")
             }
-            
+
             // Set the element
             do {
                 try proxy.setElement(at: index, to: newValue)
@@ -337,11 +337,11 @@ public final class LuaIntArrayProxy: LuaArrayProxy<Int>, LuaBridgeable {
             } catch {
                 return luaError(L, "Failed to set array element: \(error)")
             }
-            
+
             return 0
         }, 0)
         lua_settable(L, -3)
-        
+
         // __len metamethod for # operator
         lua_pushstring(L, "__len")
         lua_pushcclosure(L, { L in
@@ -353,25 +353,25 @@ public final class LuaIntArrayProxy: LuaArrayProxy<Int>, LuaBridgeable {
             return 1
         }, 0)
         lua_settable(L, -3)
-        
+
         // __ipairs metamethod for iteration
         lua_pushstring(L, "__ipairs")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
-            
+
             // Push iterator function
             lua_pushcclosure(L, { L in
                 guard let L = L else { return 0 }
-                
+
                 // Get the proxy (first upvalue of ipairs)
                 guard let proxy = LuaIntArrayProxy.checkUserdata(L, at: 1) else {
                     return luaError(L, "Invalid array proxy")
                 }
-                
+
                 // Get current index
                 let currentIndex = Int(lua_tointeger(L, 2))
                 let nextIndex = currentIndex + 1
-                
+
                 // Check if we have more elements
                 if let element = proxy.getElement(at: nextIndex) {
                     lua_pushinteger(L, lua_Integer(nextIndex))
@@ -382,17 +382,17 @@ public final class LuaIntArrayProxy: LuaArrayProxy<Int>, LuaBridgeable {
                     return 1
                 }
             }, 0)
-            
+
             // Push the proxy object (state)
             lua_pushvalue(L, 1)
-            
+
             // Push initial index (0)
             lua_pushinteger(L, 0)
-            
+
             return 3
         }, 0)
         lua_settable(L, -3)
-        
+
         // __tostring metamethod
         lua_pushstring(L, "__tostring")
         lua_pushcclosure(L, { L in
@@ -417,22 +417,22 @@ public final class LuaDoubleArrayProxy: LuaArrayProxy<Double>, LuaBridgeable {
         // Array proxies are not directly constructible from Lua
         return luaError(L, "LuaDoubleArrayProxy cannot be constructed directly")
     }
-    
+
     public static func registerConstructor(_ L: OpaquePointer, name: String) {
         // No constructor needed
     }
-    
+
     public static func registerMethods(_ L: OpaquePointer) {
         // __index metamethod for element access
         lua_pushstring(L, "__index")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
-            
+
             // Get the proxy object
             guard let proxy = LuaDoubleArrayProxy.checkUserdata(L, at: 1) else {
                 return luaError(L, "Invalid array proxy")
             }
-            
+
             // Check if key is a number (array index)
             if lua_type(L, 2) == LUA_TNUMBER {
                 let index = Int(lua_tointeger(L, 2))
@@ -444,7 +444,7 @@ public final class LuaDoubleArrayProxy: LuaArrayProxy<Double>, LuaBridgeable {
                     return 1
                 }
             }
-            
+
             // Check for special methods
             if let key = String.pull(from: L, at: 2) {
                 switch key {
@@ -460,34 +460,34 @@ public final class LuaDoubleArrayProxy: LuaArrayProxy<Double>, LuaBridgeable {
                     return 1
                 }
             }
-            
+
             lua_pushnil(L)
             return 1
         }, 0)
         lua_settable(L, -3)
-        
+
         // __newindex metamethod for element assignment
         lua_pushstring(L, "__newindex")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
-            
+
             // Get the proxy object
             guard let proxy = LuaDoubleArrayProxy.checkUserdata(L, at: 1) else {
                 return luaError(L, "Invalid array proxy")
             }
-            
+
             // Index must be a number
             guard lua_type(L, 2) == LUA_TNUMBER else {
                 return luaError(L, "Array index must be a number")
             }
-            
+
             let index = Int(lua_tointeger(L, 2))
-            
+
             // Get the new value
             guard let newValue = Double.pull(from: L, at: 3) else {
                 return luaError(L, "Invalid value type for array element")
             }
-            
+
             // Set the element
             do {
                 try proxy.setElement(at: index, to: newValue)
@@ -496,11 +496,11 @@ public final class LuaDoubleArrayProxy: LuaArrayProxy<Double>, LuaBridgeable {
             } catch {
                 return luaError(L, "Failed to set array element: \(error)")
             }
-            
+
             return 0
         }, 0)
         lua_settable(L, -3)
-        
+
         // __len metamethod for # operator
         lua_pushstring(L, "__len")
         lua_pushcclosure(L, { L in
@@ -512,25 +512,25 @@ public final class LuaDoubleArrayProxy: LuaArrayProxy<Double>, LuaBridgeable {
             return 1
         }, 0)
         lua_settable(L, -3)
-        
+
         // __ipairs metamethod for iteration
         lua_pushstring(L, "__ipairs")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
-            
+
             // Push iterator function
             lua_pushcclosure(L, { L in
                 guard let L = L else { return 0 }
-                
+
                 // Get the proxy (first upvalue of ipairs)
                 guard let proxy = LuaDoubleArrayProxy.checkUserdata(L, at: 1) else {
                     return luaError(L, "Invalid array proxy")
                 }
-                
+
                 // Get current index
                 let currentIndex = Int(lua_tointeger(L, 2))
                 let nextIndex = currentIndex + 1
-                
+
                 // Check if we have more elements
                 if let element = proxy.getElement(at: nextIndex) {
                     lua_pushinteger(L, lua_Integer(nextIndex))
@@ -541,17 +541,17 @@ public final class LuaDoubleArrayProxy: LuaArrayProxy<Double>, LuaBridgeable {
                     return 1
                 }
             }, 0)
-            
+
             // Push the proxy object (state)
             lua_pushvalue(L, 1)
-            
+
             // Push initial index (0)
             lua_pushinteger(L, 0)
-            
+
             return 3
         }, 0)
         lua_settable(L, -3)
-        
+
         // __tostring metamethod
         lua_pushstring(L, "__tostring")
         lua_pushcclosure(L, { L in
@@ -576,22 +576,22 @@ public final class LuaBoolArrayProxy: LuaArrayProxy<Bool>, LuaBridgeable {
         // Array proxies are not directly constructible from Lua
         return luaError(L, "LuaBoolArrayProxy cannot be constructed directly")
     }
-    
+
     public static func registerConstructor(_ L: OpaquePointer, name: String) {
         // No constructor needed
     }
-    
+
     public static func registerMethods(_ L: OpaquePointer) {
         // __index metamethod for element access
         lua_pushstring(L, "__index")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
-            
+
             // Get the proxy object
             guard let proxy = LuaBoolArrayProxy.checkUserdata(L, at: 1) else {
                 return luaError(L, "Invalid array proxy")
             }
-            
+
             // Check if key is a number (array index)
             if lua_type(L, 2) == LUA_TNUMBER {
                 let index = Int(lua_tointeger(L, 2))
@@ -603,7 +603,7 @@ public final class LuaBoolArrayProxy: LuaArrayProxy<Bool>, LuaBridgeable {
                     return 1
                 }
             }
-            
+
             // Check for special methods
             if let key = String.pull(from: L, at: 2) {
                 switch key {
@@ -619,34 +619,34 @@ public final class LuaBoolArrayProxy: LuaArrayProxy<Bool>, LuaBridgeable {
                     return 1
                 }
             }
-            
+
             lua_pushnil(L)
             return 1
         }, 0)
         lua_settable(L, -3)
-        
+
         // __newindex metamethod for element assignment
         lua_pushstring(L, "__newindex")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
-            
+
             // Get the proxy object
             guard let proxy = LuaBoolArrayProxy.checkUserdata(L, at: 1) else {
                 return luaError(L, "Invalid array proxy")
             }
-            
+
             // Index must be a number
             guard lua_type(L, 2) == LUA_TNUMBER else {
                 return luaError(L, "Array index must be a number")
             }
-            
+
             let index = Int(lua_tointeger(L, 2))
-            
+
             // Get the new value
             guard let newValue = Bool.pull(from: L, at: 3) else {
                 return luaError(L, "Invalid value type for array element")
             }
-            
+
             // Set the element
             do {
                 try proxy.setElement(at: index, to: newValue)
@@ -655,11 +655,11 @@ public final class LuaBoolArrayProxy: LuaArrayProxy<Bool>, LuaBridgeable {
             } catch {
                 return luaError(L, "Failed to set array element: \(error)")
             }
-            
+
             return 0
         }, 0)
         lua_settable(L, -3)
-        
+
         // __len metamethod for # operator
         lua_pushstring(L, "__len")
         lua_pushcclosure(L, { L in
@@ -671,25 +671,25 @@ public final class LuaBoolArrayProxy: LuaArrayProxy<Bool>, LuaBridgeable {
             return 1
         }, 0)
         lua_settable(L, -3)
-        
+
         // __ipairs metamethod for iteration
         lua_pushstring(L, "__ipairs")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
-            
+
             // Push iterator function
             lua_pushcclosure(L, { L in
                 guard let L = L else { return 0 }
-                
+
                 // Get the proxy (first upvalue of ipairs)
                 guard let proxy = LuaBoolArrayProxy.checkUserdata(L, at: 1) else {
                     return luaError(L, "Invalid array proxy")
                 }
-                
+
                 // Get current index
                 let currentIndex = Int(lua_tointeger(L, 2))
                 let nextIndex = currentIndex + 1
-                
+
                 // Check if we have more elements
                 if let element = proxy.getElement(at: nextIndex) {
                     lua_pushinteger(L, lua_Integer(nextIndex))
@@ -700,17 +700,17 @@ public final class LuaBoolArrayProxy: LuaArrayProxy<Bool>, LuaBridgeable {
                     return 1
                 }
             }, 0)
-            
+
             // Push the proxy object (state)
             lua_pushvalue(L, 1)
-            
+
             // Push initial index (0)
             lua_pushinteger(L, 0)
-            
+
             return 3
         }, 0)
         lua_settable(L, -3)
-        
+
         // __tostring metamethod
         lua_pushstring(L, "__tostring")
         lua_pushcclosure(L, { L in

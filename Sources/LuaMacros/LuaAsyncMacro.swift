@@ -5,11 +5,11 @@
 //  Implementation of @LuaAsync for async method support
 //
 
+import Foundation
 import SwiftCompilerPlugin
 import SwiftSyntax
 import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
-import Foundation
 
 public struct LuaAsyncMacro: PeerMacro {
     public static func expansion(
@@ -21,21 +21,21 @@ public struct LuaAsyncMacro: PeerMacro {
         guard let method = declaration.as(FunctionDeclSyntax.self) else {
             return []
         }
-        
+
         let methodName = method.name.text
         let parameters = method.signature.parameterClause.parameters
         let returnType = method.signature.returnClause?.type.description ?? "Void"
-        
+
         // Build parameter list
         var paramList: [String] = []
         var argList: [String] = []
-        
+
         for param in parameters {
             let firstName = param.firstName.text
             let secondName = param.secondName?.text
             let paramName = secondName ?? firstName
             let paramType = param.type.description
-            
+
             if firstName == "_" {
                 paramList.append("_ \(paramName): \(paramType)")
                 argList.append(paramName)
@@ -44,10 +44,10 @@ public struct LuaAsyncMacro: PeerMacro {
                 argList.append("\(firstName): \(paramName)")
             }
         }
-        
+
         let paramString = paramList.joined(separator: ", ")
         let argString = argList.joined(separator: ", ")
-        
+
         // Generate callback-based wrapper
         let callbackWrapper = """
         public func \(methodName)Callback(\(paramString)\(paramList.isEmpty ? "" : ", ")callback: @escaping (\(returnType == "Void" ? "" : returnType + ", ")Error?) -> Void) {
@@ -61,7 +61,7 @@ public struct LuaAsyncMacro: PeerMacro {
             }
         }
         """
-        
+
         return [DeclSyntax(stringLiteral: callbackWrapper)]
     }
 }

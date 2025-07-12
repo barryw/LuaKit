@@ -12,19 +12,19 @@ import Lua
 public protocol LuaTypeConverter {
     associatedtype InputType
     associatedtype OutputType
-    
+
     static func convert(_ input: InputType) throws -> OutputType
 }
 
 /// Registry for custom type converters
 public class LuaTypeConverterRegistry {
     private static var converters: [String: Any] = [:]
-    
+
     /// Register a custom converter
     public static func register<T: LuaTypeConverter>(_ converter: T.Type, name: String) {
         converters[name] = converter
     }
-    
+
     /// Get a converter by name
     public static func getConverter(named name: String) -> Any? {
         return converters[name]
@@ -57,7 +57,7 @@ public struct StringToDateConverter: LuaTypeConverter {
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
     }()
-    
+
     public static func convert(_ input: String) throws -> Date {
         guard let date = formatter.date(from: input) else {
             throw LuaKitError.invalidArgument(
@@ -118,7 +118,7 @@ extension Date: LuaConvertible {
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         lua_pushstring(L, formatter.string(from: value))
     }
-    
+
     public static func pull(from L: OpaquePointer, at index: Int32) -> Date? {
         guard let string = String.pull(from: L, at: index) else { return nil }
         do {
@@ -134,7 +134,7 @@ extension URL: LuaConvertible {
     public static func push(_ value: URL, to L: OpaquePointer) {
         lua_pushstring(L, value.absoluteString)
     }
-    
+
     public static func pull(from L: OpaquePointer, at index: Int32) -> URL? {
         guard let string = String.pull(from: L, at: index) else { return nil }
         return URL(string: string)
@@ -146,7 +146,7 @@ extension UUID: LuaConvertible {
     public static func push(_ value: UUID, to L: OpaquePointer) {
         lua_pushstring(L, value.uuidString)
     }
-    
+
     public static func pull(from L: OpaquePointer, at index: Int32) -> UUID? {
         guard let string = String.pull(from: L, at: index) else { return nil }
         return UUID(uuidString: string)
@@ -158,7 +158,7 @@ extension Data: LuaConvertible {
     public static func push(_ value: Data, to L: OpaquePointer) {
         lua_pushstring(L, value.base64EncodedString())
     }
-    
+
     public static func pull(from L: OpaquePointer, at index: Int32) -> Data? {
         guard let string = String.pull(from: L, at: index) else { return nil }
         return Data(base64Encoded: string)
@@ -186,7 +186,7 @@ extension Optional: LuaConvertible where Wrapped: LuaConvertible {
             lua_pushnil(L)
         }
     }
-    
+
     public static func pull(from L: OpaquePointer, at index: Int32) -> Wrapped?? {
         if lua_type(L, index) == LUA_TNIL {
             return .some(nil)
@@ -201,19 +201,19 @@ extension Optional: LuaConvertible where Wrapped: LuaConvertible {
 extension Dictionary: LuaConvertible where Key == String, Value: LuaConvertible {
     public static func push(_ value: [String: Value], to L: OpaquePointer) {
         lua_createtable(L, 0, Int32(value.count))
-        
+
         for (key, val) in value {
             Value.push(val, to: L)
             lua_setfield(L, -2, key)
         }
     }
-    
+
     public static func pull(from L: OpaquePointer, at index: Int32) -> [String: Value]? {
         guard lua_type(L, index) == LUA_TTABLE else { return nil }
-        
+
         var dict: [String: Value] = [:]
         let tableIndex = lua_absindex(L, index)
-        
+
         lua_pushnil(L) // First key
         while lua_next(L, tableIndex) != 0 {
             // Key is at index -2, value at index -1
@@ -223,7 +223,7 @@ extension Dictionary: LuaConvertible where Key == String, Value: LuaConvertible 
             }
             lua_pop(L, 1) // Remove value, keep key for next iteration
         }
-        
+
         return dict
     }
 }
@@ -244,7 +244,7 @@ public struct LuaConvert {
                 )
             )
         }
-        
+
         // This is a simplified version - in practice, we'd need more sophisticated type checking
         if let converter = converterType as? any LuaTypeConverter.Type {
             // Dynamic dispatch would be needed here
@@ -257,7 +257,7 @@ public struct LuaConvert {
                 )
             )
         }
-        
+
         throw LuaKitError.invalidArgument(
             LuaErrorContext(
                 functionName: "convert",
@@ -267,14 +267,14 @@ public struct LuaConvert {
             )
         )
     }
-    
+
     /// Try to convert between common types automatically
     public static func autoConvert<T>(_ value: Any, to type: T.Type) -> T? {
         // Direct cast
         if let result = value as? T {
             return result
         }
-        
+
         // String conversions
         if let string = value as? String {
             switch type {
@@ -292,7 +292,7 @@ public struct LuaConvert {
                 break
             }
         }
-        
+
         // Number conversions
         if let number = value as? NSNumber {
             switch type {
@@ -308,7 +308,7 @@ public struct LuaConvert {
                 break
             }
         }
-        
+
         return nil
     }
 }

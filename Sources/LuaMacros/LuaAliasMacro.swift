@@ -5,11 +5,11 @@
 //  Implementation of @LuaAlias for method aliasing
 //
 
+import Foundation
 import SwiftCompilerPlugin
 import SwiftSyntax
 import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
-import Foundation
 
 public struct LuaAliasMacro: PeerMacro {
     public static func expansion(
@@ -21,7 +21,7 @@ public struct LuaAliasMacro: PeerMacro {
         guard case .argumentList(let arguments) = node.arguments else {
             return []
         }
-        
+
         var aliases: [String] = []
         for argument in arguments {
             if let stringLiteral = argument.expression.as(StringLiteralExprSyntax.self),
@@ -29,16 +29,16 @@ public struct LuaAliasMacro: PeerMacro {
                 aliases.append(alias)
             }
         }
-        
+
         // Get method declaration
         guard let method = declaration.as(FunctionDeclSyntax.self) else {
             return []
         }
-        
+
         let methodName = method.name.text
         let parameters = method.signature.parameterClause.parameters
         let returnClause = method.signature.returnClause
-        
+
         // Build parameter list for forwarding
         var forwardParams: [String] = []
         for param in parameters {
@@ -50,10 +50,10 @@ public struct LuaAliasMacro: PeerMacro {
             }
         }
         let forwardParamsString = forwardParams.joined(separator: ", ")
-        
+
         // Generate alias methods
         var aliasMethods: [DeclSyntax] = []
-        
+
         for alias in aliases {
             let aliasMethod = """
             @available(*, deprecated, renamed: "\(methodName)")
@@ -63,7 +63,7 @@ public struct LuaAliasMacro: PeerMacro {
             """
             aliasMethods.append(DeclSyntax(stringLiteral: aliasMethod))
         }
-        
+
         return aliasMethods
     }
 }

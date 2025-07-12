@@ -14,7 +14,7 @@ public enum LuaError: LocalizedError {
     case typeMismatch(expected: String, got: String)
     case invalidArgument(String)
     case custom(String)
-    
+
     public var errorDescription: String? {
         switch self {
             case .memoryAllocation:
@@ -23,7 +23,7 @@ public enum LuaError: LocalizedError {
                 return "Lua syntax error: \(error)"
             case .runtime(let error):
                 return "Lua runtime error: \(error)"
-            case .typeMismatch(let expected, let got):
+            case let .typeMismatch(expected, got):
                 return "Type mismatch: expected \(expected), got \(got)"
             case .invalidArgument(let message):
                 return "Invalid argument: \(message)"

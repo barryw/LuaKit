@@ -64,7 +64,6 @@ opt_in_rules:
 # Rules to disable
 disabled_rules:
   - todo # Allow TODO comments
-  - line_length # Handled by line_length rule configuration
   - type_name # Allow flexibility in naming
   - function_parameter_count # Lua bridging may require many parameters
 
@@ -146,12 +145,6 @@ custom_rules:
     message: "Macro attributes should be directly above the declaration without blank lines"
     severity: warning
 
-  bridgeable_protocol:
-    name: "LuaBridgeable Protocol"
-    regex: 'class\s+\w+\s*:\s*.*LuaBridgeable'
-    message: "Classes conforming to LuaBridgeable should use @LuaBridgeable macro"
-    severity: info
-
 # File header template
 file_header:
   required_pattern: |
@@ -167,7 +160,3 @@ reporter: "github-actions-logging"
 
 # Strict mode for CI
 strict: false
-
-# Allow warnings in CI but fail on errors
-warning_threshold: 50
-error_threshold: 10

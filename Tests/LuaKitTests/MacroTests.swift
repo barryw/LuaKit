@@ -5,34 +5,34 @@
 //  Created by Barry Walker on 7/8/25.
 //
 
-import XCTest
 import Lua  // Required for @LuaBridgeable macro
 @testable import LuaKit
+import XCTest
 
 // Test class using the @LuaBridgeable macro
 @LuaBridgeable
 class MacroTestPerson: LuaBridgeable {  // Must explicitly conform
-    public var name: String
-    public var age: Int
-    
-    public init(name: String, age: Int) {
+    var name: String
+    var age: Int
+
+    init(name: String, age: Int) {
         self.name = name
         self.age = age
     }
-    
-    public func greet() -> String {
+
+    func greet() -> String {
         return "Hello, I'm \(name) and I'm \(age) years old"
     }
-    
+
     @LuaIgnore
-    public func getSecretInfo() -> String {
+    func getSecretInfo() -> String {
         return "This is secret: \(secretId)"
     }
-    
+
     @LuaIgnore
     private var secretId: String = "hidden"
-    
-    public var description: String {
+
+    var description: String {
         return "MacroTestPerson(name: \(name), age: \(age))"
     }
 }
@@ -41,25 +41,25 @@ class MacroTestPerson: LuaBridgeable {  // Must explicitly conform
 @LuaBridgeable(mode: .explicit)
 class SecureData: LuaBridgeable {  // Must explicitly conform
     @LuaOnly
-    public var publicName: String
-    
-    public var privateData: String  // Should not be bridged
-    
-    public init(publicName: String, privateData: String) {
+    var publicName: String
+
+    var privateData: String  // Should not be bridged
+
+    init(publicName: String, privateData: String) {
         self.publicName = publicName
         self.privateData = privateData
     }
-    
+
     @LuaOnly
-    public func getPublicInfo() -> String {
+    func getPublicInfo() -> String {
         return "Public: \(publicName)"
     }
-    
-    public func getPrivateInfo() -> String {  // Should not be bridged
+
+    func getPrivateInfo() -> String {  // Should not be bridged
         return "Private: \(privateData)"
     }
-    
-    public var description: String {
+
+    var description: String {
         return "SecureData(public: \(publicName))"
     }
 }
@@ -67,24 +67,24 @@ class SecureData: LuaBridgeable {  // Must explicitly conform
 // Test class matching the README example
 @LuaBridgeable
 class Image: LuaBridgeable {
-    public var width: Int
-    public var height: Int
-    
-    public init(width: Int, height: Int) {
+    var width: Int
+    var height: Int
+
+    init(width: Int, height: Int) {
         self.width = width
         self.height = height
     }
-    
-    public var area: Int {
+
+    var area: Int {
         return width * height
     }
-    
-    public func resize(width: Int, height: Int) {
+
+    func resize(width: Int, height: Int) {
         self.width = width
         self.height = height
     }
-    
-    public var description: String {
+
+    var description: String {
         return "Image(\(width)x\(height))"
     }
 }
@@ -93,19 +93,19 @@ final class MacroTests: XCTestCase {
     func testMacroGeneratedCode() throws {
         let lua = try LuaState()
         lua.register(MacroTestPerson.self, as: "Person")
-        
+
         var output = ""
         lua.setPrintHandler { text in
             output += text
         }
-        
+
         _ = try lua.execute("""
             local person = Person.new("Alice", 25)
             print(person)
             print(person.name)
             print(person.age)
             print(person:greet())
-            
+
             person.name = "Alicia"
             person.age = 26
             print(person:greet())
@@ -120,28 +120,28 @@ final class MacroTests: XCTestCase {
         // XCTAssertTrue(output.contains("secretId correctly not accessible"))
         // XCTAssertTrue(output.contains("getSecretInfo correctly not accessible"))
     }
-    
+
     func testExplicitBridgeMode() throws {
         let lua = try LuaState()
         lua.register(SecureData.self, as: "SecureData")
-        
+
         var output = ""
         lua.setPrintHandler { text in
             output += text
         }
-        
+
         _ = try lua.execute("""
             local data = SecureData.new("PublicAPI", "SecretKey123")
             print(data)
             print(data.publicName)
             print(data:getPublicInfo())
-            
+
             -- Try to access non-@LuaOnly members (should fail)
             local ok1, err1 = pcall(function() return data.privateData end)
             if not ok1 then
                 print("privateData correctly not accessible")
             end
-            
+
             local ok2, err2 = pcall(function() return data:getPrivateInfo() end)
             if not ok2 then
                 print("getPrivateInfo correctly not accessible")
@@ -154,35 +154,35 @@ final class MacroTests: XCTestCase {
         // XCTAssertTrue(output.contains("privateData correctly not accessible"))
         XCTAssertTrue(output.contains("getPrivateInfo correctly not accessible"))
     }
-    
+
     func testReadmeImageExample() throws {
         // This test ensures the exact example from README.md works
         let lua = try LuaState()
-        
+
         // Register the class with Lua
         lua.register(Image.self, as: "Image")
-        
+
         var output = ""
         lua.setPrintHandler { text in
             output += text
         }
-        
+
         // Use it from Lua (exact code from README)
         _ = try lua.execute("""
             local img = Image.new(1920, 1080)
             print("Size:", img.width, "x", img.height)
             img:resize(800, 600)
-            
+
             -- Additional verification including computed property
             print("After resize:", img.width, "x", img.height)
             print("Area:", img.area)
         """)
-        
+
         // Verify the output
         XCTAssertTrue(output.contains("Size:"))
         XCTAssertTrue(output.contains("1920"))
         XCTAssertTrue(output.contains("1080"))
-        
+
         XCTAssertTrue(output.contains("800"))
         XCTAssertTrue(output.contains("600"))
         XCTAssertTrue(output.contains("Area:"))
