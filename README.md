@@ -1,18 +1,75 @@
-# LuaKit
+<div align="center">
+  <img src="Images/luakit-logo.svg" alt="LuaKit Logo" width="200" height="200">
+  
+  <h1>LuaKit</h1>
+  
+  <p><strong>Seamless Swift ↔ Lua Bridging for iOS & macOS</strong></p>
+  
+  <p>
+    <a href="https://github.com/barryw/LuaKit/actions/workflows/ci-cd.yml">
+      <img src="https://github.com/barryw/LuaKit/actions/workflows/ci-cd.yml/badge.svg" alt="CI/CD Status">
+    </a>
+    <a href="https://codecov.io/gh/barryw/LuaKit">
+      <img src="https://codecov.io/gh/barryw/LuaKit/branch/main/graph/badge.svg" alt="Code Coverage">
+    </a>
+    <a href="https://github.com/barryw/LuaKit/releases">
+      <img src="https://img.shields.io/github/v/release/barryw/LuaKit?color=orange" alt="Latest Release">
+    </a>
+    <a href="https://github.com/barryw/LuaKit/blob/main/LICENSE">
+      <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT">
+    </a>
+    <a href="https://www.swift.org">
+      <img src="https://img.shields.io/badge/Swift-5.9+-orange.svg" alt="Swift 5.9+">
+    </a>
+    <a href="https://www.lua.org">
+      <img src="https://img.shields.io/badge/Lua-5.4.8-000080.svg" alt="Lua 5.4.8">
+    </a>
+  </p>
+  
+  <p>
+    <a href="https://developer.apple.com/ios/">
+      <img src="https://img.shields.io/badge/iOS-13.0+-black.svg" alt="iOS 13.0+">
+    </a>
+    <a href="https://developer.apple.com/macos/">
+      <img src="https://img.shields.io/badge/macOS-10.15+-black.svg" alt="macOS 10.15+">
+    </a>
+    <a href="https://developer.apple.com/tvos/">
+      <img src="https://img.shields.io/badge/tvOS-13.0+-black.svg" alt="tvOS 13.0+">
+    </a>
+    <a href="https://developer.apple.com/watchos/">
+      <img src="https://img.shields.io/badge/watchOS-6.0+-black.svg" alt="watchOS 6.0+">
+    </a>
+  </p>
+</div>
 
-A Swift framework for embedding Lua scripting into iOS and macOS applications with seamless Swift-Lua bridging. LuaKit includes Lua 5.4.8 embedded directly, requiring no external dependencies.
+<div align="center">
+  <h3>
+    <a href="#installation">Installation</a>
+    <span> · </span>
+    <a href="#quick-start">Quick Start</a>
+    <span> · </span>
+    <a href="#documentation">Documentation</a>
+    <span> · </span>
+    <a href="#examples">Examples</a>
+  </h3>
+</div>
 
-## Features
+---
 
-- **Easy Lua Integration**: Simple API to create and manage Lua states
-- **Swift-Lua Bridging**: Expose Swift classes and methods to Lua with minimal boilerplate
-- **Type Safety**: Automatic type conversion between Swift and Lua types
-- **Array Support**: Seamless bridging of Swift arrays (`[String]`, `[Int]`, `[Double]`, `[Bool]`)
-- **Macro Support**: Use `@LuaBridgeable` macro to automatically generate bridging code
-- **Property Change Notifications**: Track and validate property changes from Lua
-- **Global Variables**: Easy access to Lua globals with Swift subscript syntax
-- **Tables**: Create and manipulate Lua tables from Swift
-- **Error Handling**: Comprehensive error reporting for syntax and runtime errors
+A powerful Swift framework for embedding Lua scripting into iOS and macOS applications with seamless Swift-Lua bridging. LuaKit includes Lua 5.4.8 embedded directly, requiring no external dependencies.
+
+## ✨ Features
+
+### Core Features
+- 🚀 **Easy Lua Integration**: Simple API to create and manage Lua states
+- 🌉 **Swift-Lua Bridging**: Expose Swift classes and methods to Lua with minimal boilerplate
+- 🛡️ **Type Safety**: Automatic type conversion between Swift and Lua types
+- 📚 **Array Support**: Seamless bridging of Swift arrays (`[String]`, `[Int]`, `[Double]`, `[Bool]`)
+- 🎯 **Macro Support**: Use `@LuaBridgeable` macro to automatically generate bridging code
+- 📡 **Property Change Notifications**: Track and validate property changes from Lua
+- 🌍 **Global Variables**: Easy access to Lua globals with Swift subscript syntax
+- 📊 **Tables**: Create and manipulate Lua tables from Swift
+- ⚠️ **Error Handling**: Comprehensive error reporting for syntax and runtime errors
 
 ### Enhanced Features (v1.3.0+)
 
@@ -1126,7 +1183,27 @@ These limitations will be addressed as Swift's macro system matures. For now, th
 - Swift 5.5+
 - Xcode 13.0+
 
-## Changelog
+## 📖 Documentation
+
+### API Reference
+- [LuaState](Documentation/LuaState.md) - Core Lua state management
+- [LuaBridgeable](Documentation/LuaBridgeable.md) - Swift-Lua bridging protocol
+- [LuaValue](Documentation/LuaValue.md) - Type-safe Lua value wrapper
+- [Error Handling](Documentation/ErrorHandling.md) - Comprehensive error guide
+
+### Guides
+- [Getting Started](Documentation/GettingStarted.md) - Step-by-step introduction
+- [Advanced Usage](Documentation/AdvancedUsage.md) - Performance tips and best practices
+- [Migration Guide](Documentation/MigrationGuide.md) - Upgrading from older versions
+
+### Examples
+Check out the [Examples](Examples/) directory for complete sample projects:
+- 🎮 [Game Scripting](Examples/GameScripting/) - Add Lua scripting to a game
+- 🔧 [Configuration](Examples/Configuration/) - Use Lua for app configuration
+- 🤖 [Automation](Examples/Automation/) - Build automation tools with Lua
+- 📊 [Data Processing](Examples/DataProcessing/) - Process data with Lua scripts
+
+## 📈 Changelog
 
 ### v1.3.0 (Latest)
 
