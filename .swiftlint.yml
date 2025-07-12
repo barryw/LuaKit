@@ -1,0 +1,173 @@
+# SwiftLint Configuration for LuaKit
+
+# Rules to include
+opt_in_rules:
+  - array_init
+  - attributes
+  - closure_end_indentation
+  - closure_spacing
+  - collection_alignment
+  - contains_over_filter_count
+  - contains_over_filter_is_empty
+  - contains_over_first_not_nil
+  - contains_over_range_nil_comparison
+  - discouraged_object_literal
+  - empty_collection_literal
+  - empty_count
+  - empty_string
+  - enum_case_associated_values_count
+  - explicit_init
+  - extension_access_modifier
+  - fallthrough
+  - fatal_error_message
+  - file_header
+  - first_where
+  - flatmap_over_map_reduce
+  - identical_operands
+  - joined_default_parameter
+  - last_where
+  - legacy_random
+  - literal_expression_end_indentation
+  - lower_acl_than_parent
+  - modifier_order
+  - nimble_operator
+  - nslocalizedstring_key
+  - number_separator
+  - object_literal
+  - operator_usage_whitespace
+  - overridden_super_call
+  - override_in_extension
+  - pattern_matching_keywords
+  - prefer_self_type_over_type_of_self
+  - prefer_zero_over_explicit_init
+  - prohibited_super_call
+  - quick_discouraged_call
+  - quick_discouraged_focused_test
+  - quick_discouraged_pending_test
+  - reduce_into
+  - redundant_nil_coalescing
+  - redundant_type_annotation
+  - single_test_class
+  - sorted_first_last
+  - sorted_imports
+  - static_operator
+  - strong_iboutlet
+  - toggle_bool
+  - trailing_closure
+  - unneeded_parentheses_in_closure_argument
+  - untyped_error_in_catch
+  - vertical_parameter_alignment_on_call
+  - vertical_whitespace_closing_braces
+  - vertical_whitespace_opening_braces
+  - yoda_condition
+
+# Rules to disable
+disabled_rules:
+  - todo # Allow TODO comments
+  - line_length # Handled by line_length rule configuration
+  - type_name # Allow flexibility in naming
+  - function_parameter_count # Lua bridging may require many parameters
+
+# Paths to include in linting
+included:
+  - Sources
+  - Tests
+
+# Paths to exclude from linting
+excluded:
+  - .build
+  - .swiftpm
+  - Examples
+  - Docs
+
+# Rule configurations
+line_length:
+  warning: 120
+  error: 200
+  ignores_comments: true
+  ignores_urls: true
+  ignores_function_declarations: true
+  ignores_interpolated_strings: true
+
+file_length:
+  warning: 500
+  error: 1000
+  ignore_comment_only_lines: true
+
+function_body_length:
+  warning: 50
+  error: 100
+
+type_body_length:
+  warning: 300
+  error: 500
+
+cyclomatic_complexity:
+  warning: 10
+  error: 20
+
+nesting:
+  type_level:
+    warning: 3
+    error: 5
+  function_level:
+    warning: 4
+    error: 6
+
+identifier_name:
+  min_length:
+    warning: 2
+    error: 1
+  max_length:
+    warning: 50
+    error: 60
+  excluded:
+    - L # Lua state pointer
+    - id
+    - x
+    - y
+    - z
+
+large_tuple:
+  warning: 3
+  error: 4
+
+# Custom rules
+custom_rules:
+  lua_function_naming:
+    name: "Lua Function Naming"
+    regex: 'func\s+lua[A-Z]'
+    message: "Lua bridging functions should start with 'lua' prefix and be camelCase"
+    severity: warning
+
+  macro_attribute_spacing:
+    name: "Macro Attribute Spacing"
+    regex: '@Lua\w+\s*\n\s*\n'
+    message: "Macro attributes should be directly above the declaration without blank lines"
+    severity: warning
+
+  bridgeable_protocol:
+    name: "LuaBridgeable Protocol"
+    regex: 'class\s+\w+\s*:\s*.*LuaBridgeable'
+    message: "Classes conforming to LuaBridgeable should use @LuaBridgeable macro"
+    severity: info
+
+# File header template
+file_header:
+  required_pattern: |
+                    \/\/
+                    \/\/  .*\.swift
+                    \/\/  LuaKit
+                    \/\/
+                    \/\/  Created by .* on \d{1,2}\/\d{1,2}\/\d{2}\.
+                    \/\/
+
+# Reporter type
+reporter: "github-actions-logging"
+
+# Strict mode for CI
+strict: false
+
+# Allow warnings in CI but fail on errors
+warning_threshold: 50
+error_threshold: 10

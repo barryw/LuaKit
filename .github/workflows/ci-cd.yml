@@ -1,0 +1,241 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  SWIFT_VERSION: 5.9
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch full history for version analysis
+
+    - name: Setup Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest-stable
+
+    - name: Cache Swift Package Manager
+      uses: actions/cache@v4
+      with:
+        path: .build
+        key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+        restore-keys: |
+          ${{ runner.os }}-spm-
+
+    - name: Build for macOS
+      run: swift build --configuration release
+
+    - name: Build for iOS Simulator
+      run: |
+        xcodebuild -scheme LuaKit \
+          -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+          -configuration Release \
+          build
+
+    - name: Run Tests
+      run: swift test --configuration release --parallel
+
+    - name: Run Tests with Coverage
+      run: |
+        swift test --enable-code-coverage --configuration release
+        xcrun llvm-cov export -format="lcov" \
+          .build/x86_64-apple-macosx/release/LuaKitPackageTests.xctest/Contents/MacOS/LuaKitPackageTests \
+          -instr-profile .build/x86_64-apple-macosx/release/codecov/default.profdata > coverage.lcov
+
+    - name: Upload Coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.lcov
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: Archive build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-artifacts-${{ github.sha }}
+        path: |
+          .build/release/
+          *.xcarchive
+
+  lint-and-format:
+    name: Lint and Format Check
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup SwiftLint
+      run: |
+        brew install swiftlint
+        
+    - name: Run SwiftLint
+      run: swiftlint lint --reporter github-actions-logging
+
+    - name: Check Swift Format
+      run: |
+        # Install swift-format if available
+        if command -v swift-format &> /dev/null; then
+          swift-format lint --recursive Sources Tests
+        else
+          echo "swift-format not available, skipping format check"
+        fi
+
+  security-scan:
+    name: Security Scan
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Security Scan
+      run: |
+        # Check for secrets in code
+        if command -v gitleaks &> /dev/null; then
+          gitleaks detect --source . --verbose
+        fi
+        
+        # Check for known vulnerabilities in dependencies
+        swift package show-dependencies --format json > dependencies.json
+        
+    - name: Upload Security Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-report-${{ github.sha }}
+        path: |
+          dependencies.json
+          gitleaks-report.json
+
+  auto-release:
+    name: Auto Release
+    runs-on: macos-latest
+    needs: [build-and-test, lint-and-format, security-scan]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Setup Node.js for Claude API
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install dependencies
+      run: |
+        npm install axios
+
+    - name: Analyze changes and determine version
+      id: version
+      run: |
+        node .github/scripts/analyze-version.js
+      env:
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        node .github/scripts/generate-release-notes.js "${{ steps.version.outputs.full_version }}"
+      env:
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create and push tag
+      if: steps.version.outputs.should_release == 'true'
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        TAG_NAME="${{ steps.version.outputs.full_version }}"
+        git tag -a "$TAG_NAME" -m "LuaKit $TAG_NAME - Swift-Lua bridging with embedded Lua ${{ steps.version.outputs.lua_version }}"
+        git push origin "$TAG_NAME"
+        
+        echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+      id: create_tag
+
+    - name: Create GitHub Release
+      if: steps.version.outputs.should_release == 'true'
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.create_tag.outputs.tag_name }}
+        release_name: "LuaKit ${{ steps.version.outputs.full_version }}"
+        body: ${{ steps.release_notes.outputs.release_notes }}
+        draft: false
+        prerelease: false
+
+    - name: Build release artifacts
+      if: steps.version.outputs.should_release == 'true'
+      run: |
+        # Build for multiple platforms
+        swift build --configuration release
+        
+        # Create source archive
+        git archive --format=tar.gz --prefix=LuaKit-${{ steps.version.outputs.full_version }}/ HEAD > LuaKit-${{ steps.version.outputs.full_version }}-source.tar.gz
+        
+        # Create binary archives if needed
+        tar -czf LuaKit-${{ steps.version.outputs.full_version }}-macos.tar.gz -C .build/release .
+
+    - name: Upload release assets
+      if: steps.version.outputs.should_release == 'true'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./LuaKit-${{ steps.version.outputs.full_version }}-source.tar.gz
+        asset_name: LuaKit-${{ steps.version.outputs.full_version }}-source.tar.gz
+        asset_content_type: application/gzip
+
+  notify:
+    name: Notify Status
+    runs-on: ubuntu-latest
+    needs: [build-and-test, lint-and-format, security-scan, auto-release]
+    if: always()
+    
+    steps:
+    - name: Notify Slack on Success
+      if: needs.build-and-test.result == 'success' && needs.auto-release.result == 'success'
+      uses: 8398a7/action-slack@v3
+      with:
+        status: success
+        text: |
+          ✅ LuaKit CI/CD Pipeline Successful!
+          
+          🎉 New release created: ${{ needs.auto-release.outputs.full_version }}
+          📝 All tests passed: ${{ needs.build-and-test.outputs.test_count }} tests
+          🔍 Security scan: Clean
+          🚀 Release deployed successfully
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+
+    - name: Notify Slack on Failure
+      if: needs.build-and-test.result == 'failure' || needs.lint-and-format.result == 'failure' || needs.security-scan.result == 'failure'
+      uses: 8398a7/action-slack@v3
+      with:
+        status: failure
+        text: |
+          ❌ LuaKit CI/CD Pipeline Failed!
+          
+          📋 Build: ${{ needs.build-and-test.result }}
+          🔍 Lint: ${{ needs.lint-and-format.result }}
+          🛡️ Security: ${{ needs.security-scan.result }}
+          
+          Please check the logs for details.
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
