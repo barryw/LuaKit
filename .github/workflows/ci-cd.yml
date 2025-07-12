@@ -64,9 +64,39 @@ jobs:
     - name: Run Tests with Coverage
       run: |
         swift test --enable-code-coverage --configuration release
-        xcrun llvm-cov export -format="lcov" \
-          .build/x86_64-apple-macosx/release/LuaKitPackageTests.xctest/Contents/MacOS/LuaKitPackageTests \
-          -instr-profile .build/x86_64-apple-macosx/release/codecov/default.profdata > coverage.lcov
+        
+        # Detect architecture
+        ARCH=$(uname -m)
+        if [ "$ARCH" = "arm64" ]; then
+          SWIFT_ARCH="arm64-apple-macosx"
+        else
+          SWIFT_ARCH="x86_64-apple-macosx"
+        fi
+        
+        # Find the profdata file
+        PROFDATA_PATH=".build/$SWIFT_ARCH/release/codecov/default.profdata"
+        
+        # Find the test executable
+        TEST_BINARY=$(find .build/$SWIFT_ARCH/release -name "*.xctest" -type d | head -n 1)/Contents/MacOS/*
+        
+        # Export coverage
+        if [ -f "$PROFDATA_PATH" ] && [ -n "$TEST_BINARY" ]; then
+          echo "Found profdata at: $PROFDATA_PATH"
+          echo "Found test binary at: $TEST_BINARY"
+          xcrun llvm-cov export -format="lcov" \
+            $TEST_BINARY \
+            -instr-profile "$PROFDATA_PATH" > coverage.lcov
+        else
+          echo "Warning: Coverage data not found"
+          echo "Profdata path: $PROFDATA_PATH (exists: $([ -f "$PROFDATA_PATH" ] && echo "yes" || echo "no"))"
+          echo "Looking for profdata files..."
+          find .build -name "*.profdata" -type f || echo "No profdata files found"
+          echo "Looking for test executables..."
+          find .build -name "*.xctest" -type d || echo "No test executables found"
+          # Don't fail the build if coverage is not available
+          echo "Skipping coverage export"
+          touch coverage.lcov  # Create empty file so upload doesn't fail
+        fi
 
     - name: Upload Coverage to Codecov
       uses: codecov/codecov-action@v4
