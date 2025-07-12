@@ -11,6 +11,9 @@ import Lua
 public final class LuaState {
     private let L: OpaquePointer
     
+    /// Internal access to the Lua state for extensions
+    internal var luaState: OpaquePointer { L }
+    
     public init() throws {
         guard let state = luaL_newstate() else {
             throw LuaError.memoryAllocation
@@ -151,10 +154,6 @@ public final class LuaState {
     
     public func register<T: LuaBridgeable>(_ type: T.Type, as name: String) {
         type.register(in: self, as: name)
-    }
-    
-    internal var luaState: OpaquePointer {
-        return L
     }
 }
 

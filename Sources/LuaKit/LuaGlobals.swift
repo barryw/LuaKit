@@ -37,7 +37,7 @@ extension LuaState {
 
 /// Provides subscript access to Lua global variables
 public struct LuaGlobals {
-    private let luaState: LuaState
+    internal let luaState: LuaState
     
     init(luaState: LuaState) {
         self.luaState = luaState

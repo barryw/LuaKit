@@ -638,8 +638,98 @@ public struct LuaPropertyMacro: PeerMacro {
         providingPeersOf declaration: some DeclSyntaxProtocol,
         in context: some MacroExpansionContext
     ) throws -> [DeclSyntax] {
-        // This will be used for fine-grained property control
-        return []
+        // Extract property configuration
+        guard case .argumentList(let arguments) = node.arguments else {
+            return []
+        }
+        
+        var isReadOnly = false
+        var validatorName: String?
+        var minValue: Double?
+        var maxValue: Double?
+        var regexPattern: String?
+        var enumValues: [String] = []
+        
+        for argument in arguments {
+            if let label = argument.label?.text {
+                switch label {
+                case "readOnly":
+                    if let boolExpr = argument.expression.as(BooleanLiteralExprSyntax.self) {
+                        isReadOnly = boolExpr.literal.text == "true"
+                    }
+                case "validator":
+                    if let stringLiteral = argument.expression.as(StringLiteralExprSyntax.self),
+                       let validator = stringLiteral.segments.first?.as(StringSegmentSyntax.self)?.content.text {
+                        validatorName = validator
+                    }
+                case "min":
+                    if let intLiteral = argument.expression.as(IntegerLiteralExprSyntax.self) {
+                        minValue = Double(intLiteral.literal.text) ?? 0
+                    } else if let floatLiteral = argument.expression.as(FloatLiteralExprSyntax.self) {
+                        minValue = Double(floatLiteral.literal.text) ?? 0
+                    }
+                case "max":
+                    if let intLiteral = argument.expression.as(IntegerLiteralExprSyntax.self) {
+                        maxValue = Double(intLiteral.literal.text) ?? 0
+                    } else if let floatLiteral = argument.expression.as(FloatLiteralExprSyntax.self) {
+                        maxValue = Double(floatLiteral.literal.text) ?? 0
+                    }
+                case "regex":
+                    if let stringLiteral = argument.expression.as(StringLiteralExprSyntax.self),
+                       let pattern = stringLiteral.segments.first?.as(StringSegmentSyntax.self)?.content.text {
+                        regexPattern = pattern
+                    }
+                case "enumValues":
+                    if let arrayExpr = argument.expression.as(ArrayExprSyntax.self) {
+                        for element in arrayExpr.elements {
+                            if let stringLiteral = element.expression.as(StringLiteralExprSyntax.self),
+                               let value = stringLiteral.segments.first?.as(StringSegmentSyntax.self)?.content.text {
+                                enumValues.append(value)
+                            }
+                        }
+                    }
+                default:
+                    break
+                }
+            }
+        }
+        
+        // Get property declaration
+        guard let property = declaration.as(VariableDeclSyntax.self),
+              let binding = property.bindings.first,
+              let identifier = binding.pattern.as(IdentifierPatternSyntax.self) else {
+            return []
+        }
+        
+        let propertyName = identifier.identifier.text
+        var generatedCode: [DeclSyntax] = []
+        
+        // Generate validator method if custom validator is specified
+        if let validatorName = validatorName {
+            let validatorMethod = """
+            public func \(validatorName)(_ value: Any) -> Bool {
+                // Custom validation logic would be implemented here
+                return true
+            }
+            """
+            generatedCode.append(DeclSyntax(stringLiteral: validatorMethod))
+        }
+        
+        // Generate property metadata storage
+        let metadataProperty = """
+        @available(*, deprecated, message: "Property validation metadata")
+        static let __luaProperty_\(propertyName) = (
+            readOnly: \(isReadOnly),
+            validator: "\(validatorName ?? "")",
+            min: \(minValue?.description ?? "nil"),
+            max: \(maxValue?.description ?? "nil"),
+            regex: "\(regexPattern ?? "")",
+            enumValues: [\(enumValues.map { "\"\($0)\"" }.joined(separator: ", "))]
+        )
+        """
+        generatedCode.append(DeclSyntax(stringLiteral: metadataProperty))
+        
+        return generatedCode
     }
 }
 
@@ -670,10 +760,21 @@ enum MacroError: Error, CustomStringConvertible {
 struct LuaMacrosPlugin: CompilerPlugin {
     let providingMacros: [Macro.Type] = [
         LuaBridgeableMacro.self,
+        EnhancedLuaBridgeableMacro.self,
         LuaIgnoreMacro.self,
         LuaOnlyMacro.self,
         LuaMethodMacro.self,
         LuaPropertyMacro.self,
         LuaConstructorMacro.self,
+        LuaCollectionMacro.self,
+        LuaAliasMacro.self,
+        LuaFactoryMacro.self,
+        LuaAsyncMacro.self,
+        LuaDocMacro.self,
+        LuaParamMacro.self,
+        LuaChainableMacro.self,
+        LuaConvertMacro.self,
+        LuaNamespaceMacro.self,
+        LuaRelationshipMacro.self,
     ]
 }

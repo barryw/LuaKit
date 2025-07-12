@@ -1,0 +1,419 @@
+//
+//  EnhancementsTests.swift
+//  LuaKitTests
+//
+//  Tests for the 15 enhancement features
+//
+
+import XCTest
+@testable import LuaKit
+import Lua
+
+final class EnhancementsTests: XCTestCase {
+    
+    // MARK: - Test Better Error Messages (#15)
+    
+    func testDetailedErrorMessages() throws {
+        let lua = try LuaState()
+        
+        // Register a test function
+        lua.registerFunction("testFunc") { (a: Int, b: String) in
+            return a
+        }
+        
+        // Test with wrong argument type
+        do {
+            _ = try lua.execute("""
+                testFunc("not a number", "string")
+            """)
+            XCTFail("Should have thrown an error")
+        } catch {
+            let errorMessage = error.localizedDescription
+            XCTAssertTrue(errorMessage.contains("Invalid argument"))
+            XCTAssertTrue(errorMessage.contains("Expected: integer"))
+            XCTAssertTrue(errorMessage.contains("Got: string"))
+        }
+    }
+    
+    // MARK: - Test Debug Helpers (#10)
+    
+    func testDebugMode() throws {
+        let lua = try LuaState()
+        
+        // Enable debug mode
+        lua.setDebugMode(true)
+        lua.setDebugLogLevel(.verbose)
+        
+        // Create a test class with debug enabled
+        @LuaBridgeable(debug: true)
+        class DebugTest: LuaBridgeable {
+            var value: Int = 0
+            
+            init() {
+                LuaMemoryTracker.trackAllocation("DebugTest")
+            }
+            
+            deinit {
+                LuaMemoryTracker.trackDeallocation("DebugTest")
+            }
+            
+            func setValue(_ newValue: Int) {
+                value = newValue
+            }
+        }
+        
+        lua.register(DebugTest.self, as: "DebugTest")
+        
+        // Execute and check debug output
+        try lua.execute("""
+            local obj = DebugTest.new()
+            obj:setValue(42)
+            obj.value = 100
+        """)
+        
+        // Check performance report
+        let perfReport = lua.getPerformanceReport()
+        XCTAssertTrue(perfReport.contains("LuaKit Performance Report"))
+        
+        // Check memory report
+        let memReport = lua.getMemoryReport()
+        XCTAssertTrue(memReport.contains("LuaKit Memory Report"))
+    }
+    
+    // MARK: - Test Type Conversion (#13)
+    
+    func testTypeConversion() throws {
+        let lua = try LuaState()
+        
+        // Test built-in conversions
+        
+        // Date conversion
+        lua.globals["testDate"] = Date(timeIntervalSince1970: 1000000)
+        let dateResult = try lua.executeReturning("return testDate", as: String.self)
+        XCTAssertTrue(dateResult.contains("1970"))
+        
+        // URL conversion
+        lua.globals["testURL"] = URL(string: "https://example.com")!
+        let urlResult = try lua.executeReturning("return testURL", as: String.self)
+        XCTAssertEqual(urlResult, "https://example.com")
+        
+        // UUID conversion
+        let uuid = UUID()
+        lua.globals["testUUID"] = uuid
+        let uuidResult = try lua.executeReturning("return testUUID", as: String.self)
+        XCTAssertEqual(uuidResult, uuid.uuidString)
+        
+        // Data conversion (base64)
+        let data = "Hello".data(using: .utf8)!
+        lua.globals["testData"] = data
+        let dataResult = try lua.executeReturning("return testData", as: String.self)
+        XCTAssertEqual(dataResult, data.base64EncodedString())
+    }
+    
+    // MARK: - Test Global Function Registration (#8)
+    
+    func testGlobalFunctionRegistration() throws {
+        let lua = try LuaState()
+        
+        // Register various types of globals
+        lua.registerGlobal("PI", 3.14159)
+        lua.registerGlobal("appName", "TestApp")
+        lua.registerGlobal("isDebug", true)
+        
+        // Register a function
+        lua.registerFunction("multiply") { (a: Int, b: Int) in
+            return a * b
+        }
+        
+        // Register multiple globals at once
+        lua.registerGlobals([
+            "version": "1.0.0",
+            "maxPlayers": 4,
+            "serverURL": "https://api.example.com"
+        ])
+        
+        // Test namespace registration
+        let math = lua.registerNamespace("math")
+        math.register("add", LuaFunction { (a: Int, b: Int) in a + b })
+        math.register("subtract", LuaFunction { (a: Int, b: Int) in a - b })
+        
+        // Verify all registrations work
+        let result = try lua.executeReturning("""
+            return {
+                pi = PI,
+                app = appName,
+                debug = isDebug,
+                calc = multiply(6, 7),
+                ver = version,
+                players = maxPlayers,
+                url = serverURL,
+                sum = math.add(10, 5),
+                diff = math.subtract(10, 5)
+            }
+        """, as: [String: Any].self)
+        
+        XCTAssertEqual(result["pi"] as? Double, 3.14159, accuracy: 0.00001)
+        XCTAssertEqual(result["app"] as? String, "TestApp")
+        XCTAssertEqual(result["debug"] as? Bool, true)
+        XCTAssertEqual(result["calc"] as? Int, 42)
+        XCTAssertEqual(result["ver"] as? String, "1.0.0")
+        XCTAssertEqual(result["players"] as? Int, 4)
+        XCTAssertEqual(result["sum"] as? Int, 15)
+        XCTAssertEqual(result["diff"] as? Int, 5)
+    }
+    
+    // MARK: - Test Optional Support
+    
+    func testOptionalTypes() throws {
+        let lua = try LuaState()
+        
+        // Test optional parameters and returns
+        lua.registerFunction("findUser") { (id: Int) -> String? in
+            return id == 1 ? "Alice" : nil
+        }
+        
+        lua.registerFunction("greet") { (name: String?) in
+            return "Hello, \(name ?? "Anonymous")"
+        }
+        
+        // Test nil handling
+        let result1 = try lua.executeReturning("return findUser(1)", as: String.self)
+        XCTAssertEqual(result1, "Alice")
+        
+        let nilCheck = try lua.executeReturning("return findUser(2) == nil", as: Bool.self)
+        XCTAssertTrue(nilCheck)
+        
+        let greeting1 = try lua.executeReturning("return greet('Bob')", as: String.self)
+        XCTAssertEqual(greeting1, "Hello, Bob")
+        
+        let greeting2 = try lua.executeReturning("return greet(nil)", as: String.self)
+        XCTAssertEqual(greeting2, "Hello, Anonymous")
+    }
+    
+    // MARK: - Test Dictionary Support
+    
+    func testDictionaryTypes() throws {
+        let lua = try LuaState()
+        
+        // Register a function that returns a dictionary
+        lua.registerFunction("getConfig") { () -> [String: Any] in
+            return [
+                "host": "localhost",
+                "port": 8080,
+                "secure": true,
+                "timeout": 30.0
+            ]
+        }
+        
+        // Register a function that accepts a dictionary
+        lua.registerFunction("configure") { (config: [String: String]) in
+            return config["host"] ?? "unknown"
+        }
+        
+        // Test dictionary return
+        let config = try lua.executeReturning("return getConfig()", as: [String: Any].self)
+        XCTAssertEqual(config["host"] as? String, "localhost")
+        XCTAssertEqual(config["port"] as? Int, 8080)
+        XCTAssertEqual(config["secure"] as? Bool, true)
+        XCTAssertEqual(config["timeout"] as? Double, 30.0)
+        
+        // Test dictionary parameter
+        let host = try lua.executeReturning("""
+            return configure({ host = "example.com", port = "443" })
+        """, as: String.self)
+        XCTAssertEqual(host, "example.com")
+    }
+    
+    // MARK: - Test Namespace Builder
+    
+    func testNamespaceBuilder() throws {
+        let lua = try LuaState()
+        
+        // Use the fluent namespace builder
+        LuaGlobals(lua).namespace("utils")
+            .add("version", "1.0.0")
+            .add("author", "Test")
+            .function("double") { (n: Int) in n * 2 }
+            .function("triple") { (n: Int) in n * 3 }
+            .build()
+        
+        // Verify namespace was created correctly
+        let version = try lua.executeReturning("return utils.version", as: String.self)
+        XCTAssertEqual(version, "1.0.0")
+        
+        let doubled = try lua.executeReturning("return utils.double(5)", as: Int.self)
+        XCTAssertEqual(doubled, 10)
+        
+        let tripled = try lua.executeReturning("return utils.triple(5)", as: Int.self)
+        XCTAssertEqual(tripled, 15)
+    }
+    
+    // MARK: - Test Auto Type Conversion
+    
+    func testAutoTypeConversion() throws {
+        // Test the auto conversion utility
+        XCTAssertEqual(LuaConvert.autoConvert("123", to: Int.self), 123)
+        XCTAssertEqual(LuaConvert.autoConvert("3.14", to: Double.self), 3.14)
+        XCTAssertEqual(LuaConvert.autoConvert("true", to: Bool.self), true)
+        
+        let uuidString = "123e4567-e89b-12d3-a456-426614174000"
+        XCTAssertEqual(LuaConvert.autoConvert(uuidString, to: UUID.self)?.uuidString, uuidString)
+        
+        let urlString = "https://example.com"
+        XCTAssertEqual(LuaConvert.autoConvert(urlString, to: URL.self)?.absoluteString, urlString)
+        
+        // Test NSNumber conversions
+        let number = NSNumber(value: 42)
+        XCTAssertEqual(LuaConvert.autoConvert(number, to: Int.self), 42)
+        XCTAssertEqual(LuaConvert.autoConvert(number, to: Double.self), 42.0)
+        XCTAssertEqual(LuaConvert.autoConvert(NSNumber(value: true), to: Bool.self), true)
+    }
+    
+    // MARK: - Test Enum Bridging (#6)
+    
+    func testEnumBridging() throws {
+        let lua = try LuaState()
+        
+        // Define test enum
+        enum TestImageType: String, CaseIterable, LuaEnumBridgeable {
+            case sprite = "sprite"
+            case bitmap = "bitmap"
+            case vector = "vector"
+        }
+        
+        // Register enum
+        lua.registerEnum(TestImageType.self, as: "ImageType")
+        
+        // Test enum access
+        let spriteType = try lua.executeReturning("return ImageType.sprite", as: String.self)
+        XCTAssertEqual(spriteType, "sprite")
+        
+        // Test validation function
+        let isValid = try lua.executeReturning("return validateImageType('sprite')", as: Bool.self)
+        XCTAssertTrue(isValid)
+        
+        let isInvalid = try lua.executeReturning("return validateImageType('invalid')", as: Bool.self)
+        XCTAssertFalse(isInvalid)
+        
+        // Test enum usage in bridged class
+        @LuaBridgeable
+        class EnumTestImage: LuaBridgeable {
+            var type: TestImageType = .sprite
+            
+            init() {}
+        }
+        
+        lua.register(EnumTestImage.self, as: "EnumTestImage")
+        
+        try lua.execute("""
+            local img = EnumTestImage.new()
+            img.type = ImageType.bitmap
+        """)
+        
+        // Verify the enum was set correctly
+        let typeResult = try lua.executeReturning("return img.type", as: String.self)
+        XCTAssertEqual(typeResult, "bitmap")
+    }
+    
+    // MARK: - Test Property Validation (#5)
+    
+    func testPropertyValidation() throws {
+        let lua = try LuaState()
+        
+        // Register ValidatedImage class (from example)
+        lua.register(ValidatedImage.self, as: "ValidatedImage")
+        
+        // Test range validation
+        do {
+            _ = try lua.execute("""
+                local img = ValidatedImage.new("test", 100, 100)
+                img.width = 400  -- Should fail (max: 320)
+            """)
+            XCTFail("Should have thrown validation error")
+        } catch {
+            // Expected to fail
+        }
+        
+        // Test regex validation
+        do {
+            _ = try lua.execute("""
+                local img = ValidatedImage.new("test", 100, 100)
+                img.backgroundColor = "invalid"  -- Should fail regex
+            """)
+            XCTFail("Should have thrown validation error")
+        } catch {
+            // Expected to fail
+        }
+        
+        // Test valid values
+        try lua.execute("""
+            local img = ValidatedImage.new("test", 100, 100)
+            img.width = 200  -- Valid
+            img.backgroundColor = "#FF0000"  -- Valid hex color
+        """)
+    }
+    
+    // MARK: - Test Async Support (#9)
+    
+    func testAsyncSupport() throws {
+        let lua = try LuaState()
+        
+        // Register async support
+        lua.registerAsyncSupport()
+        
+        // Register AsyncOperations class
+        lua.register(AsyncOperations.self, as: "AsyncOps")
+        
+        // Test async method with callback
+        let expectation = XCTestExpectation(description: "Async operation completes")
+        
+        lua.registerFunction("onImageLoaded") { (imageName: String) in
+            XCTAssertEqual(imageName, "loaded")
+            expectation.fulfill()
+        }
+        
+        try lua.execute("""
+            local async = AsyncOps.new()
+            async:loadImageCallback("https://example.com/image.png", function(image, error)
+                if error then
+                    print("Error:", error)
+                else
+                    onImageLoaded(image.name)
+                end
+            end)
+        """)
+        
+        wait(for: [expectation], timeout: 1.0)
+    }
+    
+    // MARK: - Test Collection Methods (#2)
+    
+    func testCollectionMethods() throws {
+        let lua = try LuaState()
+        
+        // Register CollectionExample
+        lua.register(CollectionExample.self, as: "CollectionExample")
+        lua.register(BridgeableImage.self, as: "Image")
+        
+        try lua.execute("""
+            local collection = CollectionExample.new()
+            
+            -- Test auto-generated collection methods
+            collection:addImages(Image.new("img1", 100, 100))
+            collection:addImages(Image.new("img2", 200, 200))
+            
+            -- Check count
+            local count = collection:getImagesCount()
+            assert(count == 2, "Expected 2 images")
+            
+            -- Get at index
+            local img1 = collection:getImagesAt(0)
+            assert(img1.name == "img1", "Expected img1")
+            
+            -- Test string collection
+            collection:addTags("red")
+            collection:addTags("blue")
+            assert(collection:getTagsCount() == 2, "Expected 2 tags")
+        """)
+    }
+}

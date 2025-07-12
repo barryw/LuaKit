@@ -1,0 +1,409 @@
+//
+//  EnhancementsExample.swift
+//  LuaKit
+//
+//  Demonstrates the 15 enhancement features
+//
+
+import Foundation
+import LuaKit
+import Lua
+
+// MARK: - Enhancement #1: Methods Returning Different Types
+
+@LuaBridgeable(debug: true)
+public class BridgeableProject: LuaBridgeable {
+    public var name: String
+    public var images: [BridgeableImage] = []
+    
+    public init(name: String) {
+        self.name = name
+    }
+    
+    // Different return types - no workarounds needed!
+    public func getImages() -> [BridgeableImage] {
+        return images
+    }
+    
+    public func findImage(name: String) -> BridgeableImage? {
+        return images.first { $0.name == name }
+    }
+    
+    public func getImageCount() -> Int {
+        return images.count
+    }
+    
+    public func hasImages() -> Bool {
+        return !images.isEmpty
+    }
+    
+    public func getCreationDate() -> Date {
+        return Date()
+    }
+    
+    public func getProjectURL() -> URL? {
+        return URL(string: "https://example.com/project/\(name)")
+    }
+}
+
+// MARK: - Enhancement #2: Collection/Array Method Syntax
+
+@LuaBridgeable
+public class CollectionExample: LuaBridgeable {
+    @LuaCollection("images")
+    public var images: [BridgeableImage] = []
+    
+    @LuaCollection("tags")
+    public var tags: [String] = []
+    
+    public init() {}
+}
+
+// MARK: - Enhancement #3: Method Aliases
+
+@LuaBridgeable
+public class BridgeableImage: LuaBridgeable {
+    public var name: String
+    public var width: Int
+    public var height: Int
+    
+    public init(name: String, width: Int, height: Int) {
+        self.name = name
+        self.width = width
+        self.height = height
+    }
+    
+    @LuaAlias("drawLine", "line")
+    public func drawLineNew(x1: Int, y1: Int, x2: Int, y2: Int, color: Int) {
+        // Implementation
+    }
+    
+    @LuaAlias("clear", "cls")
+    public func clearScreen() {
+        // Implementation
+    }
+}
+
+// MARK: - Enhancement #4: Factory Methods
+
+@LuaBridgeable
+public class ImageFactory: LuaBridgeable {
+    public init() {}
+    
+    @LuaFactory
+    public func createImage(name: String, width: Int, height: Int) -> BridgeableImage {
+        return BridgeableImage(name: name, width: width, height: height)
+    }
+    
+    @LuaFactory
+    public func createSprite(name: String) -> BridgeableImage {
+        return BridgeableImage(name: name, width: 16, height: 16)
+    }
+}
+
+// MARK: - Enhancement #5: Property Validation
+
+@LuaBridgeable
+public class ValidatedImage: LuaBridgeable {
+    @LuaProperty(readOnly: true)
+    public let id: UUID = UUID()
+    
+    @LuaProperty(validator: "validateName")
+    public var name: String
+    
+    @LuaProperty(min: 1, max: 320)
+    public var width: Int
+    
+    @LuaProperty(min: 1, max: 240)
+    public var height: Int
+    
+    @LuaProperty(regex: "^#[0-9A-Fa-f]{6}$")
+    public var backgroundColor: String = "#000000"
+    
+    public init(name: String, width: Int, height: Int) {
+        self.name = name
+        self.width = width
+        self.height = height
+    }
+    
+    public func validateName(_ value: String) -> Bool {
+        return !value.isEmpty && value.count <= 50
+    }
+}
+
+// MARK: - Enhancement #6: Enum Bridging
+
+public enum ImageType: String, CaseIterable {
+    case sprite = "sprite"
+    case bob = "bob"
+    case bitmap = "bitmap"
+    case font = "font"
+}
+
+@LuaBridgeable
+public class TypedImage: LuaBridgeable {
+    public var name: String
+    public var type: ImageType
+    
+    public init(name: String, type: ImageType) {
+        self.name = name
+        self.type = type
+    }
+}
+
+// MARK: - Enhancement #7: Relationships
+
+@LuaBridgeable
+public class RelatedProject: LuaBridgeable {
+    public var name: String
+    
+    @LuaRelationship(type: .oneToMany, inverse: "project")
+    public var images: [BridgeableImage] = []
+    
+    @LuaRelationship(type: .oneToMany, cascade: .delete)
+    public var palettes: [Palette] = []
+    
+    public init(name: String) {
+        self.name = name
+    }
+}
+
+@LuaBridgeable
+public class Palette: LuaBridgeable {
+    public var name: String
+    public var colors: [String] = []
+    
+    public init(name: String) {
+        self.name = name
+    }
+}
+
+// MARK: - Enhancement #8: Global Function Registration (shown in usage)
+
+// MARK: - Enhancement #9: Async Support
+
+@LuaBridgeable
+public class AsyncOperations: LuaBridgeable {
+    public init() {}
+    
+    @LuaAsync
+    public func loadImage(url: String) async throws -> BridgeableImage {
+        // Simulate async loading
+        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        return BridgeableImage(name: "loaded", width: 100, height: 100)
+    }
+    
+    @LuaAsync
+    public func exportProject(_ project: BridgeableProject) async -> Bool {
+        // Simulate async export
+        try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+        return true
+    }
+}
+
+// MARK: - Enhancement #10: Debug Helpers (shown with debug: true in @LuaBridgeable)
+
+// MARK: - Enhancement #11: Documentation
+
+@LuaBridgeable
+public class DocumentedAPI: LuaBridgeable {
+    public init() {}
+    
+    @LuaDoc("Sets a pixel at the given coordinates")
+    @LuaParam("x", "X coordinate (1-based)")
+    @LuaParam("y", "Y coordinate (1-based)")
+    @LuaParam("color", "Color index (0-255)")
+    public func setPixel(x: Int, y: Int, color: Int) {
+        // Implementation
+    }
+    
+    @LuaDoc("Draws a filled rectangle")
+    @LuaParam("x", "Top-left X coordinate")
+    @LuaParam("y", "Top-left Y coordinate")
+    @LuaParam("width", "Rectangle width")
+    @LuaParam("height", "Rectangle height")
+    @LuaParam("color", "Fill color index")
+    public func fillRect(x: Int, y: Int, width: Int, height: Int, color: Int) {
+        // Implementation
+    }
+}
+
+// MARK: - Enhancement #12: Method Chaining
+
+@LuaBridgeable
+public class ChainableGraphics: LuaBridgeable {
+    private var currentColor: Int = 0
+    
+    public init() {}
+    
+    @LuaChainable
+    public func setColor(_ color: Int) -> Self {
+        currentColor = color
+        return self
+    }
+    
+    @LuaChainable
+    public func drawPixel(x: Int, y: Int) -> Self {
+        // Draw with current color
+        return self
+    }
+    
+    @LuaChainable
+    public func drawLine(x1: Int, y1: Int, x2: Int, y2: Int) -> Self {
+        // Draw line with current color
+        return self
+    }
+}
+
+// MARK: - Enhancement #13: Type Conversion
+
+@LuaBridgeable
+public class ConversionExample: LuaBridgeable {
+    public init() {}
+    
+    // Automatically convert string to UUID
+    public func findById(@LuaConvert(from: String.self, using: "StringToUUID") id: UUID) -> Bool {
+        // Implementation
+        return true
+    }
+    
+    // Automatically convert string to Date
+    public func setDate(@LuaConvert(from: String.self, using: "StringToDate") date: Date) {
+        // Implementation
+    }
+}
+
+// MARK: - Enhancement #14: Namespace Support
+
+@LuaNamespace("graphics")
+public class DrawingTools {
+    public static func createGradient(startColor: String, endColor: String) -> [String] {
+        return [startColor, endColor]
+    }
+    
+    public static func createPattern(type: String) -> String {
+        return "pattern:\(type)"
+    }
+}
+
+@LuaNamespace("audio")
+public class AudioTools {
+    public static func loadSound(name: String) -> Bool {
+        return true
+    }
+    
+    public static func playSound(name: String, volume: Double) {
+        // Implementation
+    }
+}
+
+// MARK: - Enhancement #15: Better Error Messages (integrated throughout)
+
+// MARK: - Usage Example
+
+public func demonstrateEnhancements() throws {
+    let lua = try LuaState()
+    
+    // Enable debug mode
+    lua.setDebugMode(true)
+    lua.setDebugLogLevel(.verbose)
+    
+    // Register enhanced types
+    lua.register(BridgeableProject.self, as: "Project")
+    lua.register(BridgeableImage.self, as: "Image")
+    lua.register(ImageFactory.self, as: "ImageFactory")
+    lua.register(ValidatedImage.self, as: "ValidatedImage")
+    lua.register(TypedImage.self, as: "TypedImage")
+    lua.register(AsyncOperations.self, as: "AsyncOps")
+    lua.register(ChainableGraphics.self, as: "Graphics")
+    
+    // Register enums
+    lua.registerEnum(ImageType.self, as: "ImageType")
+    
+    // Register global functions with documentation
+    lua.registerDocumentedFunction(
+        "createProject",
+        description: "Creates a new project",
+        parameters: [("name", "string", "The project name")],
+        returns: "Project",
+        function: LuaFunction { (name: String) in
+            return BridgeableProject(name: name)
+        }
+    )
+    
+    // Register namespaces
+    let graphics = lua.registerNamespace("graphics")
+    graphics.register("createGradient", LuaFunction { (start: String, end: String) in
+        return DrawingTools.createGradient(startColor: start, endColor: end)
+    })
+    
+    // Use the enhancements
+    try lua.execute("""
+        -- 1. Different return types
+        local project = createProject("MyGame")
+        print("Has images:", project:hasImages())  -- returns bool
+        print("Image count:", project:getImageCount())  -- returns int
+        local url = project:getProjectURL()  -- returns URL?
+        
+        -- 2. Collection methods (auto-generated)
+        -- project:addImage(image)
+        -- project:removeImage(image)
+        -- project:getImageAt(1)
+        
+        -- 3. Method aliases
+        local img = Image.new("test", 100, 100)
+        img:drawLine(0, 0, 100, 100, 1)  -- alias for drawLineNew
+        img:clear()  -- alias for clearScreen
+        
+        -- 4. Factory methods
+        local factory = ImageFactory.new()
+        local sprite = factory:createSprite("player")
+        
+        -- 5. Property validation
+        local vimg = ValidatedImage.new("test", 50, 50)
+        -- vimg.width = 400  -- Would fail validation (max: 320)
+        
+        -- 6. Enum support
+        local typed = TypedImage.new("sprite1", ImageType.sprite)
+        print("Image type:", typed.type)
+        
+        -- 7. Relationships (with cascade)
+        -- Deleting project would cascade delete palettes
+        
+        -- 8. Global function registration
+        -- Already shown with createProject
+        
+        -- 9. Async support
+        local async = AsyncOps.new()
+        async:loadImage("https://example.com/image.png", function(image)
+            print("Image loaded:", image.name)
+        end)
+        
+        -- 10. Debug helpers
+        -- All method calls and property access are logged
+        
+        -- 11. Documentation
+        -- Available through reflection
+        
+        -- 12. Method chaining
+        local g = Graphics.new()
+        g:setColor(5):drawPixel(10, 10):drawLine(0, 0, 50, 50)
+        
+        -- 13. Type conversion
+        -- Automatic string to UUID/Date conversion
+        
+        -- 14. Namespace support
+        graphics.createGradient("#FF0000", "#00FF00")
+        
+        -- 15. Better error messages
+        -- img:drawLine("not a number", 0, 100, 100, 1)
+        -- Error: Invalid argument #1 to 'Image:drawLine'
+        -- Expected: integer
+        -- Got: string ("not a number")
+        -- Parameter 'x1'
+    """)
+    
+    // Print debug reports
+    print("\n" + lua.getPerformanceReport())
+    print("\n" + lua.getMemoryReport())
+}
