@@ -299,33 +299,31 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
             codeLines.append("")
         }
 
-        // Generate property access methods
-        if !properties.isEmpty {
-            // Generate __index method for property reading
-            codeLines.append("// Register __index method for property access")
-            codeLines.append("lua_pushstring(L, \"__index\")")
-            codeLines.append("lua_pushcclosure(L, { L in")
-            codeLines.append("    guard let L = L else { return 0 }")
-            codeLines.append("    guard let obj = \(className).checkUserdata(L, at: 1) else {")
-            codeLines.append("        return luaError(L, \"Invalid \(className) object\")")
-            codeLines.append("    }")
-            codeLines.append("")
-            codeLines.append("    guard let key = String.pull(from: L, at: 2) else {")
-            codeLines.append("        return 0")
-            codeLines.append("    }")
-            codeLines.append("")
-            codeLines.append("    switch key {")
+        // Always generate __index method for both property and method access
+        codeLines.append("// Register __index method for property and method access")
+        codeLines.append("lua_pushstring(L, \"__index\")")
+        codeLines.append("lua_pushcclosure(L, { L in")
+        codeLines.append("    guard let L = L else { return 0 }")
+        codeLines.append("    guard let obj = \(className).checkUserdata(L, at: 1) else {")
+        codeLines.append("        return luaError(L, \"Invalid \(className) object\")")
+        codeLines.append("    }")
+        codeLines.append("")
+        codeLines.append("    guard let key = String.pull(from: L, at: 2) else {")
+        codeLines.append("        return 0")
+        codeLines.append("    }")
+        codeLines.append("")
+        codeLines.append("    switch key {")
 
-            for property in properties {
-                // Extract property names from binding patterns
-                for binding in property.bindings {
-                    if let identPattern = binding.pattern.as(IdentifierPatternSyntax.self) {
-                        let propName = identPattern.identifier.text
-                        let propType = binding.typeAnnotation?.type.description ?? "Unknown"
+        for property in properties {
+            // Extract property names from binding patterns
+            for binding in property.bindings {
+                if let identPattern = binding.pattern.as(IdentifierPatternSyntax.self) {
+                    let propName = identPattern.identifier.text
+                    let propType = binding.typeAnnotation?.type.description ?? "Unknown"
 
-                        codeLines.append("    case \"\(propName)\":")
-                        // Handle array types first - return proxies instead of arrays
-                        if propType.contains("[String]") {
+                    codeLines.append("    case \"\(propName)\":")
+                    // Handle array types first - return proxies instead of arrays
+                    if propType.contains("[String]") {
                             codeLines.append("        let proxy = LuaStringArrayProxy(")
                             codeLines.append("            owner: obj,")
                             codeLines.append("            propertyName: \"\(propName)\",")
@@ -422,10 +420,8 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
             }
 
             codeLines.append("    default:")
-            codeLines.append("        // Check metatable for methods")
-            codeLines.append("        lua_getmetatable(L, 1)")
-            codeLines.append("        lua_pushstring(L, key)")
-            codeLines.append("        lua_rawget(L, -2)")
+            codeLines.append("        // Return nil for unknown properties - methods are found directly in metatable")
+            codeLines.append("        lua_pushnil(L)")
             codeLines.append("        return 1")
             codeLines.append("    }")
             codeLines.append("}, 0)")

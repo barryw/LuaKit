@@ -54,11 +54,21 @@ extension LuaBridgeable {
 
         luaL_newmetatable(L, metaTableName)
 
-        lua_pushstring(L, "__index")
-        lua_pushvalue(L, -2)
-        lua_settable(L, -3)
-
+        // First call registerMethods to let it set up custom __index if needed
         registerMethods(L)
+        
+        // Check if __index was already set by registerMethods (macro-generated classes)
+        lua_pushstring(L, "__index")
+        lua_rawget(L, -2)
+        let hasCustomIndex = !lua_isnil(L, -1)
+        lua_pop(L, 1)
+        
+        // Only set default __index if registerMethods didn't provide one
+        if !hasCustomIndex {
+            lua_pushstring(L, "__index")
+            lua_pushvalue(L, -2)
+            lua_settable(L, -3)
+        }
 
         lua_pushstring(L, "__gc")
         lua_pushcclosure(L, { L in
