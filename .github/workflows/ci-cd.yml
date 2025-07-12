@@ -215,14 +215,30 @@ jobs:
         git config --local http.https://github.com/.extraheader "AUTHORIZATION: basic $(echo -n x-access-token:${{ secrets.GITHUB_TOKEN }} | base64)"
         
         TAG_NAME="${{ steps.version.outputs.full_version }}"
+        
+        # Check if tag already exists
+        if git rev-parse "refs/tags/$TAG_NAME" >/dev/null 2>&1; then
+          echo "Tag $TAG_NAME already exists locally"
+          # Check if it exists on remote
+          if git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME"; then
+            echo "Tag $TAG_NAME already exists on remote. Skipping tag creation."
+            echo "tag_exists=true" >> $GITHUB_OUTPUT
+            echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+        fi
+        
+        # Create and push the tag
+        echo "Creating new tag: $TAG_NAME"
         git tag -a "$TAG_NAME" -m "LuaKit $TAG_NAME - Swift-Lua bridging with embedded Lua ${{ steps.version.outputs.lua_version }}"
         git push origin "$TAG_NAME"
         
+        echo "tag_exists=false" >> $GITHUB_OUTPUT
         echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
       id: create_tag
 
     - name: Create GitHub Release
-      if: steps.version.outputs.should_release == 'true'
+      if: steps.version.outputs.should_release == 'true' && steps.create_tag.outputs.tag_exists != 'true'
       uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -234,7 +250,7 @@ jobs:
         prerelease: false
 
     - name: Build release artifacts
-      if: steps.version.outputs.should_release == 'true'
+      if: steps.version.outputs.should_release == 'true' && steps.create_tag.outputs.tag_exists != 'true'
       run: |
         # Build for multiple platforms
         swift build --configuration release
@@ -246,7 +262,7 @@ jobs:
         tar -czf LuaKit-${{ steps.version.outputs.full_version }}-macos.tar.gz -C .build/release .
 
     - name: Upload release assets
-      if: steps.version.outputs.should_release == 'true'
+      if: steps.version.outputs.should_release == 'true' && steps.create_tag.outputs.tag_exists != 'true'
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
