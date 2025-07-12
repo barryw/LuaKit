@@ -1175,6 +1175,20 @@ These limitations will be addressed as Swift's macro system matures. For now, th
 - Array bridging for primitive types
 - Property change notifications
 
+## Credits
+
+<div align="center">
+  <a href="https://www.lua.org/">
+    <img src="Images/lua-logo.gif" alt="Lua" width="128">
+  </a>
+  <br>
+  <strong>Powered by Lua 5.4.8</strong>
+</div>
+
+LuaKit embeds the [Lua](https://www.lua.org/) programming language, created by Roberto Ierusalimschy, Waldemar Celes, and Luiz Henrique de Figueiredo at PUC-Rio. We are grateful for their excellent work on creating such a powerful, lightweight, and embeddable scripting language.
+
+Lua is licensed under the [MIT license](https://www.lua.org/license.html).
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
