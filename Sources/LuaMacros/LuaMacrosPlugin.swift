@@ -36,7 +36,12 @@ public struct LuaBridgeableMacro: MemberMacro {
         // Extract initializers to generate luaNew method
         let initializers = classDecl.memberBlock.members
             .compactMap { $0.decl.as(InitializerDeclSyntax.self) }
-            .filter { $0.modifiers.contains { $0.name.tokenKind == .keyword(.public) } }
+            .filter { 
+                // Include public or internal (default) initializers
+                let isPublic = $0.modifiers.contains { $0.name.tokenKind == .keyword(.public) }
+                let isInternal = $0.modifiers.isEmpty || $0.modifiers.contains { $0.name.tokenKind == .keyword(.internal) }
+                return isPublic || isInternal
+            }
 
         // Extract methods to bridge based on mode and attributes
         let allMethods = classDecl.memberBlock.members
@@ -47,8 +52,11 @@ public struct LuaBridgeableMacro: MemberMacro {
 
         let bridgedMethods = allMethods
             .filter { method, member in
+                // Check if method is public or internal (default visibility)
                 let isPublic = method.modifiers.contains { $0.name.tokenKind == .keyword(.public) }
-                guard isPublic else { return false }
+                let isInternal = method.modifiers.isEmpty || method.modifiers.contains { $0.name.tokenKind == .keyword(.internal) }
+                let isAccessible = isPublic || isInternal
+                guard isAccessible else { return false }
 
                 // Exclude property change notification methods
                 let methodName = method.name.text
@@ -69,8 +77,11 @@ public struct LuaBridgeableMacro: MemberMacro {
 
         let bridgedProperties = allProperties
             .filter { property, member in
+                // Check if property is public or internal (default visibility)
                 let isPublic = property.modifiers.contains { $0.name.tokenKind == .keyword(.public) }
-                guard isPublic else { return false }
+                let isInternal = property.modifiers.isEmpty || property.modifiers.contains { $0.name.tokenKind == .keyword(.internal) }
+                let isAccessible = isPublic || isInternal
+                guard isAccessible else { return false }
 
                 return shouldBridgeMember(member: member, bridgeMode: bridgeMode)
             }
