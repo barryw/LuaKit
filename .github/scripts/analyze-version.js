@@ -302,9 +302,21 @@ async function main() {
     
     if (commits.length === 0) {
       console.log('No new commits since last tag');
-      console.log('::set-output name=should_release::false');
-      console.log(`::set-output name=new_version::${currentVersion}`);
-      console.log(`::set-output name=full_version::${formatVersionWithLua(currentVersion)}`);
+      
+      if (process.env.GITHUB_OUTPUT) {
+        const outputs = [
+          `should_release=false`,
+          `new_version=${currentVersion}`,
+          `full_version=${formatVersionWithLua(currentVersion)}`,
+          `lua_version=${getLuaVersion()}`,
+          `release_type=none`,
+          `reasoning=No commits since last tag`,
+          `changelog_summary=No changes`
+        ].join('\n');
+        
+        fs.appendFileSync(process.env.GITHUB_OUTPUT, outputs + '\n');
+      }
+      
       return;
     }
     
@@ -320,17 +332,10 @@ async function main() {
     // Format version with Lua suffix
     const formattedVersion = formatVersionWithLua(analysis.new_version);
     
-    // Set GitHub Actions outputs (sanitize for single-line output)
+    // Sanitize multiline strings for GitHub Actions output
     const sanitize = (str) => str.replace(/\n/g, ' ').replace(/\r/g, '');
-    console.log(`::set-output name=should_release::${analysis.should_release}`);
-    console.log(`::set-output name=new_version::${analysis.new_version}`);
-    console.log(`::set-output name=full_version::${formattedVersion}`);
-    console.log(`::set-output name=lua_version::${getLuaVersion()}`);
-    console.log(`::set-output name=release_type::${analysis.release_type}`);
-    console.log(`::set-output name=reasoning::${sanitize(analysis.reasoning)}`);
-    console.log(`::set-output name=changelog_summary::${sanitize(analysis.changelog_summary)}`);
     
-    // Also write to environment file for newer GitHub Actions
+    // Write outputs to GitHub Actions environment file
     if (process.env.GITHUB_OUTPUT) {
       const outputs = [
         `should_release=${analysis.should_release}`,
@@ -343,6 +348,20 @@ async function main() {
       ].join('\n');
       
       fs.appendFileSync(process.env.GITHUB_OUTPUT, outputs + '\n');
+      
+      // Log for visibility
+      console.log('GitHub Actions outputs set:');
+      console.log(`  should_release: ${analysis.should_release}`);
+      console.log(`  new_version: ${analysis.new_version}`);
+      console.log(`  full_version: ${formattedVersion}`);
+      console.log(`  release_type: ${analysis.release_type}`);
+    } else {
+      // Fallback for local testing
+      console.log('GITHUB_OUTPUT not set, outputs:');
+      console.log(`  should_release: ${analysis.should_release}`);
+      console.log(`  new_version: ${analysis.new_version}`);
+      console.log(`  full_version: ${formattedVersion}`);
+      console.log(`  release_type: ${analysis.release_type}`);
     }
     
   } catch (error) {
