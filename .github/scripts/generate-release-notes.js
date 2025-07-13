@@ -185,6 +185,8 @@ Please generate professional release notes that include:
 
 Format as Markdown suitable for GitHub releases. Use emojis appropriately but professionally. Make it engaging but informative. Focus on user value and developer experience improvements.
 
+IMPORTANT: Do NOT use triple backticks for code blocks. Use 4-space indentation instead. Avoid using single backticks for inline code - use plain text or **bold** instead.
+
 If this is a major release, emphasize the significance. If it's a patch release, focus on stability and fixes.
 
 The framework is for Swift developers who want to embed Lua scripting in their iOS/macOS apps with seamless Swift-Lua object bridging.`;
@@ -223,15 +225,13 @@ This release was automatically created by our CI/CD pipeline powered by Claude A
 - **Build Status**: ✅ All tests passing (${testResults.testCount} tests)
 - **Code Quality**: ✅ Linting and security checks passed
 - **Release Date**: ${new Date().toISOString().split('T')[0]}
-- **Commit Hash**: \`${execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim().substring(0, 8)}\`
+- **Commit Hash**: ${execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim().substring(0, 8)}
 
 ## 📦 Installation
 
-\`\`\`swift
-dependencies: [
-    .package(url: "https://github.com/barryw/LuaKit", from: "${versionInfo.semanticVersion}")
-]
-\`\`\`
+    dependencies: [
+        .package(url: "https://github.com/barryw/LuaKit", from: "${versionInfo.semanticVersion}")
+    ]
 
 > **Lua Version**: This release includes **Lua ${versionInfo.luaVersion}** embedded directly - no external dependencies required!
 
@@ -297,11 +297,9 @@ ${commits.length > 10 ? `\n... and ${commits.length - 10} more commits` : ''}
 
 Add to your Package.swift:
 
-\`\`\`swift
-dependencies: [
-    .package(url: "https://github.com/barryw/LuaKit", from: "${versionInfo.semanticVersion}")
-]
-\`\`\`
+    dependencies: [
+        .package(url: "https://github.com/barryw/LuaKit", from: "${versionInfo.semanticVersion}")
+    ]
 
 ## Requirements
 
