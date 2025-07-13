@@ -50,11 +50,19 @@ async function getChangedFiles(tag) {
   }
 }
 
-async function getCurrentVersion() {
+async function getCurrentVersion(latestTag) {
+  // If we have a latest tag, extract the semantic version from it
+  if (latestTag) {
+    // Remove the lua suffix to get clean semantic version
+    const version = latestTag.replace(/\+lua[\d.]+$/, '');
+    return version;
+  }
+  
+  // Fallback to looking in files if no tag exists
   const packageSwiftPath = 'Package.swift';
   const readmePath = 'README.md';
   
-  let version = '1.3.0'; // Default fallback
+  let version = '1.0.0'; // Default fallback for initial release
   
   // Try to extract version from Package.swift
   if (fs.existsSync(packageSwiftPath)) {
@@ -246,7 +254,7 @@ async function main() {
     const changedFiles = await getChangedFiles(latestTag);
     console.log('Changed files:', changedFiles.length);
     
-    const currentVersion = await getCurrentVersion();
+    const currentVersion = await getCurrentVersion(latestTag);
     console.log('Current version:', currentVersion);
     
     if (commits.length === 0) {
