@@ -30,9 +30,42 @@ public final class LuaState {
 
     private var printOutput: String = ""
     private var printHandler: ((String) -> Void)?
+    private var maxPrintBufferSize: Int = 1_000_000  // 1MB default
+    private var printBufferPolicy: PrintBufferPolicy = .unlimited
+    
+    /// Policy for managing print buffer size and behavior
+    public enum PrintBufferPolicy {
+        case unlimited
+        case truncateOldest
+        case truncateNewest
+        case maxSize(Int)
+    }
+    
+    /// Type alias for output handlers that receive print output immediately
+    public typealias PrintOutputHandler = (String) -> Void
 
     public func setPrintHandler(_ handler: @escaping (String) -> Void) {
         self.printHandler = handler
+    }
+    
+    /// Configure the print buffer policy for managing output accumulation
+    public func setPrintBufferPolicy(_ policy: PrintBufferPolicy) {
+        self.printBufferPolicy = policy
+    }
+    
+    /// Set the output handler for streaming print output (replaces setPrintHandler with better naming)
+    public func setOutputHandler(_ handler: @escaping PrintOutputHandler) {
+        self.printHandler = handler
+    }
+    
+    /// Clear the print buffer manually
+    public func clearPrintBuffer() {
+        printOutput = ""
+    }
+    
+    /// Get current buffer contents without executing any code
+    public func getCurrentPrintBuffer() -> String {
+        return printOutput
     }
 
     private func setupPrintCapture() {
@@ -99,7 +132,8 @@ public final class LuaState {
     }
 
     public func execute(_ code: String) throws -> String {
-        printOutput = ""
+        // Don't reset buffer automatically - let user control this
+        // printOutput = ""  // REMOVED - users can call clearPrintBuffer() if needed
 
         if luaL_loadstring(L, code) != LUA_OK {
             let error = getError()
@@ -111,7 +145,31 @@ public final class LuaState {
             throw LuaError.runtime(error)
         }
 
-        return printOutput
+        return managePrintBuffer()
+    }
+    
+    /// Manage print buffer according to configured policy
+    private func managePrintBuffer() -> String {
+        switch printBufferPolicy {
+        case .unlimited:
+            return printOutput
+        case .truncateOldest:
+            if printOutput.count > maxPrintBufferSize {
+                let startIndex = printOutput.index(printOutput.startIndex, offsetBy: printOutput.count - maxPrintBufferSize)
+                printOutput = String(printOutput[startIndex...])
+            }
+            return printOutput
+        case .truncateNewest:
+            if printOutput.count > maxPrintBufferSize {
+                printOutput = String(printOutput.prefix(maxPrintBufferSize))
+            }
+            return printOutput
+        case .maxSize(let size):
+            if printOutput.count > size {
+                printOutput = String(printOutput.prefix(size))
+            }
+            return printOutput
+        }
     }
 
     public func executeReturning<T: LuaConvertible>(_ code: String, as type: T.Type = T.self) throws -> T {
@@ -246,3 +304,4 @@ extension Array: LuaConvertible where Element: LuaConvertible {
         return array
     }
 }
+
