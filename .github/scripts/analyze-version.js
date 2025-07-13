@@ -329,6 +329,19 @@ async function main() {
     
     console.log('Analysis result:', analysis);
     
+    // TEMPORARY: Force release if we have any commits
+    if (commits.length > 0 && !analysis.should_release) {
+      console.log('WARNING: Analysis said no release, but we have commits. Forcing release.');
+      analysis.should_release = true;
+      if (analysis.new_version === currentVersion) {
+        // Increment patch version
+        const versionParts = currentVersion.split('.').map(Number);
+        versionParts[2] += 1;
+        analysis.new_version = versionParts.join('.');
+        analysis.release_type = 'patch';
+      }
+    }
+    
     // Format version with Lua suffix
     const formattedVersion = formatVersionWithLua(analysis.new_version);
     
