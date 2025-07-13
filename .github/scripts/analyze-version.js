@@ -134,9 +134,11 @@ Please analyze these changes and determine:
 
 Guidelines:
 - MAJOR: Breaking changes, major new features that change the API
-- MINOR: New features, enhancements that are backward compatible
+- MINOR: New features, enhancements that are backward compatible  
 - PATCH: Bug fixes, documentation updates, minor improvements
-- Don't create a release for: minor docs, CI changes, formatting, etc.
+- CREATE a release if there are 3+ commits with meaningful changes
+- CREATE a release if there are any source code fixes or improvements
+- Only SKIP releases for trivial changes like single typo fixes
 
 Consider:
 - Changes to Sources/ are more significant than changes to docs
@@ -190,6 +192,7 @@ Respond with a JSON object only:
     
     // Fallback logic if Claude fails
     const hasSourceChanges = changedFiles.some(file => file.startsWith('Sources/'));
+    const hasWorkflowChanges = changedFiles.some(file => file.includes('.github/'));
     const hasBreakingChanges = commits.some(commit => 
       commit.toLowerCase().includes('breaking') || 
       commit.toLowerCase().includes('major')
@@ -197,19 +200,24 @@ Respond with a JSON object only:
     const hasFeatures = commits.some(commit => 
       commit.toLowerCase().includes('feat') || 
       commit.toLowerCase().includes('add') ||
-      commit.toLowerCase().includes('new')
+      commit.toLowerCase().includes('new') ||
+      commit.toLowerCase().includes('implement')
     );
     const hasFixes = commits.some(commit => 
       commit.toLowerCase().includes('fix') || 
-      commit.toLowerCase().includes('bug')
+      commit.toLowerCase().includes('bug') ||
+      commit.toLowerCase().includes('resolve')
     );
     
-    if (!hasSourceChanges && commits.length < 3) {
+    // Be more aggressive about releasing when there are multiple commits
+    const shouldRelease = hasSourceChanges || commits.length >= 5 || (hasFixes && commits.length >= 3);
+    
+    if (!shouldRelease) {
       return {
         should_release: false,
         new_version: currentVersion,
         release_type: 'none',
-        reasoning: 'No significant changes detected',
+        reasoning: `Only ${commits.length} commits, no source changes`,
         changelog_summary: 'Minor updates'
       };
     }
@@ -231,11 +239,13 @@ Respond with a JSON object only:
     
     newVersion = versionParts.join('.');
     
+    const releaseType = hasBreakingChanges ? 'major' : hasFeatures ? 'minor' : 'patch';
+    
     return {
-      should_release: hasSourceChanges || commits.length >= 3,
+      should_release: shouldRelease,
       new_version: newVersion,
-      release_type: hasBreakingChanges ? 'major' : hasFeatures ? 'minor' : 'patch',
-      reasoning: 'Fallback analysis based on commit patterns',
+      release_type: releaseType,
+      reasoning: `Fallback analysis: ${commits.length} commits, source changes: ${hasSourceChanges}, fixes: ${hasFixes}, features: ${hasFeatures}`,
       changelog_summary: `${commits.length} commits with ${changedFiles.length} changed files`
     };
   }
@@ -261,8 +271,14 @@ async function main() {
       console.log('No new commits since last tag');
       console.log('::set-output name=should_release::false');
       console.log(`::set-output name=new_version::${currentVersion}`);
+      console.log(`::set-output name=full_version::${formatVersionWithLua(currentVersion)}`);
       return;
     }
+    
+    console.log('Commits found:');
+    commits.forEach((commit, i) => console.log(`  ${i+1}. ${commit}`));
+    console.log('Changed files:');
+    changedFiles.forEach(file => console.log(`  - ${file}`));
     
     const analysis = await analyzeWithClaude(commits, changedFiles, currentVersion);
     
