@@ -168,10 +168,10 @@ Please analyze these changes and determine:
 Guidelines:
 - MAJOR: Breaking changes, major new features that change the API
 - MINOR: New features, enhancements that are backward compatible  
-- PATCH: Bug fixes, documentation updates, minor improvements
-- CREATE a release if there are 3+ commits with meaningful changes
-- CREATE a release if there are any source code fixes or improvements
-- Only SKIP releases for trivial changes like single typo fixes
+- PATCH: Bug fixes, documentation updates, CI/CD improvements, any code changes
+- ALWAYS CREATE a release when there are new commits (new code = new release)
+- Even workflow/CI changes deserve a patch release
+- The only time to skip a release is when there are 0 commits
 
 Consider:
 - Changes to Sources/ are more significant than changes to docs
@@ -329,17 +329,38 @@ async function main() {
     
     console.log('Analysis result:', analysis);
     
-    // TEMPORARY: Force release if we have any commits
-    if (commits.length > 0 && !analysis.should_release) {
-      console.log('WARNING: Analysis said no release, but we have commits. Forcing release.');
-      analysis.should_release = true;
-      if (analysis.new_version === currentVersion) {
-        // Increment patch version
-        const versionParts = currentVersion.split('.').map(Number);
-        versionParts[2] += 1;
-        analysis.new_version = versionParts.join('.');
-        analysis.release_type = 'patch';
+    // ALWAYS release when there are commits - new code = new release
+    if (commits.length > 0) {
+      if (!analysis.should_release) {
+        console.log('Enforcing release policy: New code = new release');
+        analysis.should_release = true;
       }
+      
+      // Ensure version is incremented
+      if (analysis.new_version === currentVersion) {
+        const versionParts = currentVersion.split('.').map(Number);
+        
+        // Determine increment based on changes
+        if (analysis.release_type === 'major') {
+          versionParts[0] += 1;
+          versionParts[1] = 0;
+          versionParts[2] = 0;
+        } else if (analysis.release_type === 'minor') {
+          versionParts[1] += 1;
+          versionParts[2] = 0;
+        } else {
+          // Default to patch for any changes
+          versionParts[2] += 1;
+          analysis.release_type = 'patch';
+        }
+        
+        analysis.new_version = versionParts.join('.');
+        analysis.reasoning = 'New code = new release (automated policy)';
+      }
+    } else if (commits.length === 0) {
+      // No commits = no release
+      analysis.should_release = false;
+      analysis.reasoning = 'No new commits since last release';
     }
     
     // Format version with Lua suffix
