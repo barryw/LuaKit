@@ -161,7 +161,7 @@ Respond with a JSON object only:
     const response = await axios.post(
       'https://api.anthropic.com/v1/messages',
       {
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-3-5-haiku-latest',
         max_tokens: 1000,
         messages: [{
           role: 'user',
@@ -283,17 +283,6 @@ async function main() {
     const analysis = await analyzeWithClaude(commits, changedFiles, currentVersion);
     
     console.log('Analysis result:', analysis);
-    
-    // FORCE A RELEASE FOR DEBUGGING - REMOVE AFTER TESTING
-    if (!analysis.should_release && commits.length > 0) {
-      console.log('FORCING RELEASE FOR DEBUGGING');
-      const versionParts = currentVersion.split('.').map(Number);
-      versionParts[2] += 1; // Force patch increment
-      analysis.should_release = true;
-      analysis.new_version = versionParts.join('.');
-      analysis.release_type = 'patch';
-      analysis.reasoning = 'FORCED RELEASE FOR DEBUGGING';
-    }
     
     // Format version with Lua suffix
     const formattedVersion = formatVersionWithLua(analysis.new_version);
