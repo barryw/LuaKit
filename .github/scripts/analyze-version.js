@@ -161,7 +161,7 @@ Respond with a JSON object only:
     const response = await axios.post(
       'https://api.anthropic.com/v1/messages',
       {
-        model: 'claude-3-sonnet-20240229',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 1000,
         messages: [{
           role: 'user',
@@ -223,7 +223,6 @@ Respond with a JSON object only:
     }
     
     // Determine version bump
-    let newVersion = currentVersion;
     const versionParts = currentVersion.split('.').map(Number);
     
     if (hasBreakingChanges) {
@@ -233,11 +232,12 @@ Respond with a JSON object only:
     } else if (hasFeatures) {
       versionParts[1] += 1;
       versionParts[2] = 0;
-    } else if (hasFixes) {
+    } else if (hasFixes || shouldRelease) {
+      // Always increment patch if we're releasing
       versionParts[2] += 1;
     }
     
-    newVersion = versionParts.join('.');
+    const newVersion = versionParts.join('.');
     
     const releaseType = hasBreakingChanges ? 'major' : hasFeatures ? 'minor' : 'patch';
     
