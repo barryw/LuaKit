@@ -82,10 +82,11 @@ jobs:
         PROFDATA_PATH=".build/$SWIFT_ARCH/release/codecov/default.profdata"
         
         # Find the test executable
-        TEST_BINARY=$(find ".build/$SWIFT_ARCH/release" -name "*.xctest" -type d | head -n 1)/Contents/MacOS/*
+        XCTEST_BUNDLE=$(find ".build/$SWIFT_ARCH/release" -name "*.xctest" -type d | head -n 1)
+        TEST_BINARY=$(find "$XCTEST_BUNDLE/Contents/MacOS" -type f -executable | head -n 1)
         
         # Export coverage
-        if [ -f "$PROFDATA_PATH" ] && [ -n "$TEST_BINARY" ]; then
+        if [ -f "$PROFDATA_PATH" ] && [ -n "$TEST_BINARY" ] && [ -f "$TEST_BINARY" ]; then
           echo "Found profdata at: $PROFDATA_PATH"
           echo "Found test binary at: $TEST_BINARY"
           xcrun llvm-cov export -format="lcov" \
@@ -94,10 +95,16 @@ jobs:
         else
           echo "Warning: Coverage data not found"
           echo "Profdata path: $PROFDATA_PATH (exists: $([ -f "$PROFDATA_PATH" ] && echo "yes" || echo "no"))"
+          echo "Test binary path: $TEST_BINARY (exists: $([ -f "$TEST_BINARY" ] && echo "yes" || echo "no"))"
+          echo "XCTest bundle: $XCTEST_BUNDLE"
           echo "Looking for profdata files..."
           find .build -name "*.profdata" -type f || echo "No profdata files found"
           echo "Looking for test executables..."
           find .build -name "*.xctest" -type d || echo "No test executables found"
+          if [ -n "$XCTEST_BUNDLE" ] && [ -d "$XCTEST_BUNDLE" ]; then
+            echo "Contents of $XCTEST_BUNDLE/Contents/MacOS:"
+            ls -la "$XCTEST_BUNDLE/Contents/MacOS" || echo "MacOS directory not found"
+          fi
           # Don't fail the build if coverage is not available
           echo "Skipping coverage export"
           touch coverage.lcov  # Create empty file so upload doesn't fail
