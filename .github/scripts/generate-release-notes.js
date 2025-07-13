@@ -177,7 +177,7 @@ Please generate professional release notes that include:
 3. **Bug Fixes** - Any bugs that were fixed
 4. **Technical Changes** - Under-the-hood improvements
 5. **Breaking Changes** - If any (highlight clearly)
-6. **Installation** - Swift Package Manager instructions
+6. **Installation** - Brief Swift Package Manager instructions (will be supplemented in footer)
 7. **Compatibility** - Platform and Swift version requirements
 8. **Testing** - Test coverage and quality assurance notes
 9. **Contributors** - Thank contributors if multiple authors
@@ -226,12 +226,6 @@ This release was automatically created by our CI/CD pipeline powered by Claude A
 - **Code Quality**: ✅ Linting and security checks passed
 - **Release Date**: ${new Date().toISOString().split('T')[0]}
 - **Commit Hash**: ${execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim().substring(0, 8)}
-
-## 📦 Installation
-
-    dependencies: [
-        .package(url: "https://github.com/barryw/LuaKit", from: "${versionInfo.semanticVersion}")
-    ]
 
 > **Lua Version**: This release includes **Lua ${versionInfo.luaVersion}** embedded directly - no external dependencies required!
 
