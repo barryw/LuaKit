@@ -178,7 +178,7 @@ public class LuaFunction {
         if debugMode {
             print("LuaKit: Pushing result of type \(type(of: result))")
         }
-        
+
         // Check for Void first
         if result is Void {
             return 0
@@ -198,115 +198,24 @@ public class LuaFunction {
         case let string as String:
             lua_pushstring(L, string)
             return 1
-            
-        // ADD COLLECTION SUPPORT BEFORE OPTIONAL HANDLING
+
+        // Collections
         case let dict as [String: Any]:
-            if debugMode {
-                print("LuaKit: Creating Lua table from Dictionary with \(dict.count) entries")
-            }
-            lua_createtable(L, 0, Int32(dict.count))
-            for (key, value) in dict {
-                lua_pushstring(L, key)
-                _ = pushResult(value, to: L)
-                lua_settable(L, -3)
-            }
-            return 1
-
+            return pushDictionary(dict, to: L)
         case let array as [Any]:
-            if debugMode {
-                print("LuaKit: Creating Lua array from [Any] with \(array.count) elements")
-            }
-            lua_createtable(L, Int32(array.count), 0)
-            for (index, value) in array.enumerated() {
-                lua_pushinteger(L, lua_Integer(index + 1))
-                _ = pushResult(value, to: L)
-                lua_settable(L, -3)
-            }
-            return 1
-
-        // TYPED ARRAYS
+            return pushAnyArray(array, to: L)
         case let stringArray as [String]:
-            if debugMode {
-                print("LuaKit: Creating Lua array from [String] with \(stringArray.count) elements")
-            }
-            lua_createtable(L, Int32(stringArray.count), 0)
-            for (index, value) in stringArray.enumerated() {
-                lua_pushinteger(L, lua_Integer(index + 1))
-                lua_pushstring(L, value)
-                lua_settable(L, -3)
-            }
-            return 1
-
+            return pushStringArray(stringArray, to: L)
         case let intArray as [Int]:
-            if debugMode {
-                print("LuaKit: Creating Lua array from [Int] with \(intArray.count) elements")
-            }
-            lua_createtable(L, Int32(intArray.count), 0)
-            for (index, value) in intArray.enumerated() {
-                lua_pushinteger(L, lua_Integer(index + 1))
-                lua_pushinteger(L, lua_Integer(value))
-                lua_settable(L, -3)
-            }
-            return 1
-
+            return pushIntArray(intArray, to: L)
         case let doubleArray as [Double]:
-            if debugMode {
-                print("LuaKit: Creating Lua array from [Double] with \(doubleArray.count) elements")
-            }
-            lua_createtable(L, Int32(doubleArray.count), 0)
-            for (index, value) in doubleArray.enumerated() {
-                lua_pushinteger(L, lua_Integer(index + 1))
-                lua_pushnumber(L, value)
-                lua_settable(L, -3)
-            }
-            return 1
-
+            return pushDoubleArray(doubleArray, to: L)
         case let boolArray as [Bool]:
-            if debugMode {
-                print("LuaKit: Creating Lua array from [Bool] with \(boolArray.count) elements")
-            }
-            lua_createtable(L, Int32(boolArray.count), 0)
-            for (index, value) in boolArray.enumerated() {
-                lua_pushinteger(L, lua_Integer(index + 1))
-                lua_pushboolean(L, value ? 1 : 0)
-                lua_settable(L, -3)
-            }
-            return 1
-            
-        // IMPROVED OPTIONAL HANDLING TO PREVENT INFINITE RECURSION
+            return pushBoolArray(boolArray, to: L)
+
+        // Optionals
         case let optional as Any?:
-            if let value = optional {
-                // Prevent infinite recursion by checking if we're dealing with another optional
-                let mirror = Mirror(reflecting: value)
-                if mirror.displayStyle == .optional {
-                    if debugMode {
-                        print("LuaKit: Unwrapping nested optionals")
-                    }
-                    // Handle nested optionals by unwrapping completely
-                    var unwrapped: Any? = value
-                    while let current = unwrapped {
-                        let currentMirror = Mirror(reflecting: current)
-                        if currentMirror.displayStyle == .optional {
-                            let children = currentMirror.children
-                            unwrapped = children.first?.value
-                        } else {
-                            unwrapped = current
-                            break
-                        }
-                    }
-                    if let finalValue = unwrapped {
-                        return pushResult(finalValue, to: L)
-                    } else {
-                        lua_pushnil(L)
-                        return 1
-                    }
-                } else {
-                    return pushResult(value, to: L)
-                }
-            } else {
-                lua_pushnil(L)
-                return 1
-            }
+            return pushOptional(optional, to: L)
         case let bridgeable as LuaBridgeable:
             type(of: bridgeable).pushAny(bridgeable, to: L)
             return 1
@@ -314,6 +223,117 @@ public class LuaFunction {
             if debugMode {
                 print("LuaKit: Unsupported type \(type(of: result)), pushing nil")
             }
+            lua_pushnil(L)
+            return 1
+        }
+    }
+
+    private static func pushDictionary(_ dict: [String: Any], to L: OpaquePointer) -> Int32 {
+        if debugMode {
+            print("LuaKit: Creating Lua table from Dictionary with \(dict.count) entries")
+        }
+        lua_createtable(L, 0, Int32(dict.count))
+        for (key, value) in dict {
+            lua_pushstring(L, key)
+            _ = pushResult(value, to: L)
+            lua_settable(L, -3)
+        }
+        return 1
+    }
+
+    private static func pushAnyArray(_ array: [Any], to L: OpaquePointer) -> Int32 {
+        if debugMode {
+            print("LuaKit: Creating Lua array from [Any] with \(array.count) elements")
+        }
+        lua_createtable(L, Int32(array.count), 0)
+        for (index, value) in array.enumerated() {
+            lua_pushinteger(L, lua_Integer(index + 1))
+            _ = pushResult(value, to: L)
+            lua_settable(L, -3)
+        }
+        return 1
+    }
+
+    private static func pushStringArray(_ array: [String], to L: OpaquePointer) -> Int32 {
+        if debugMode {
+            print("LuaKit: Creating Lua array from [String] with \(array.count) elements")
+        }
+        lua_createtable(L, Int32(array.count), 0)
+        for (index, value) in array.enumerated() {
+            lua_pushinteger(L, lua_Integer(index + 1))
+            lua_pushstring(L, value)
+            lua_settable(L, -3)
+        }
+        return 1
+    }
+
+    private static func pushIntArray(_ array: [Int], to L: OpaquePointer) -> Int32 {
+        if debugMode {
+            print("LuaKit: Creating Lua array from [Int] with \(array.count) elements")
+        }
+        lua_createtable(L, Int32(array.count), 0)
+        for (index, value) in array.enumerated() {
+            lua_pushinteger(L, lua_Integer(index + 1))
+            lua_pushinteger(L, lua_Integer(value))
+            lua_settable(L, -3)
+        }
+        return 1
+    }
+
+    private static func pushDoubleArray(_ array: [Double], to L: OpaquePointer) -> Int32 {
+        if debugMode {
+            print("LuaKit: Creating Lua array from [Double] with \(array.count) elements")
+        }
+        lua_createtable(L, Int32(array.count), 0)
+        for (index, value) in array.enumerated() {
+            lua_pushinteger(L, lua_Integer(index + 1))
+            lua_pushnumber(L, value)
+            lua_settable(L, -3)
+        }
+        return 1
+    }
+
+    private static func pushBoolArray(_ array: [Bool], to L: OpaquePointer) -> Int32 {
+        if debugMode {
+            print("LuaKit: Creating Lua array from [Bool] with \(array.count) elements")
+        }
+        lua_createtable(L, Int32(array.count), 0)
+        for (index, value) in array.enumerated() {
+            lua_pushinteger(L, lua_Integer(index + 1))
+            lua_pushboolean(L, value ? 1 : 0)
+            lua_settable(L, -3)
+        }
+        return 1
+    }
+
+    private static func pushOptional(_ optional: Any?, to L: OpaquePointer) -> Int32 {
+        if let value = optional {
+            let mirror = Mirror(reflecting: value)
+            if mirror.displayStyle == .optional {
+                if debugMode {
+                    print("LuaKit: Unwrapping nested optionals")
+                }
+                var unwrapped: Any? = value
+                while let current = unwrapped {
+                    let currentMirror = Mirror(reflecting: current)
+                    if currentMirror.displayStyle == .optional {
+                        let children = currentMirror.children
+                        unwrapped = children.first?.value
+                    } else {
+                        unwrapped = current
+                        break
+                    }
+                }
+                if let finalValue = unwrapped {
+                    return pushResult(finalValue, to: L)
+                } else {
+                    lua_pushnil(L)
+                    return 1
+                }
+            } else {
+                return pushResult(value, to: L)
+            }
+        } else {
             lua_pushnil(L)
             return 1
         }

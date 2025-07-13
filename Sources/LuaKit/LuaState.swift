@@ -32,7 +32,7 @@ public final class LuaState {
     private var printHandler: ((String) -> Void)?
     private var maxPrintBufferSize: Int = 1_000_000  // 1MB default
     private var printBufferPolicy: PrintBufferPolicy = .unlimited
-    
+
     /// Policy for managing print buffer size and behavior
     public enum PrintBufferPolicy {
         case unlimited
@@ -40,29 +40,29 @@ public final class LuaState {
         case truncateNewest
         case maxSize(Int)
     }
-    
+
     /// Type alias for output handlers that receive print output immediately
     public typealias PrintOutputHandler = (String) -> Void
 
     public func setPrintHandler(_ handler: @escaping (String) -> Void) {
         self.printHandler = handler
     }
-    
+
     /// Configure the print buffer policy for managing output accumulation
     public func setPrintBufferPolicy(_ policy: PrintBufferPolicy) {
         self.printBufferPolicy = policy
     }
-    
+
     /// Set the output handler for streaming print output (replaces setPrintHandler with better naming)
     public func setOutputHandler(_ handler: @escaping PrintOutputHandler) {
         self.printHandler = handler
     }
-    
+
     /// Clear the print buffer manually
     public func clearPrintBuffer() {
         printOutput = ""
     }
-    
+
     /// Get current buffer contents without executing any code
     public func getCurrentPrintBuffer() -> String {
         return printOutput
@@ -147,7 +147,7 @@ public final class LuaState {
 
         return managePrintBuffer()
     }
-    
+
     /// Manage print buffer according to configured policy
     private func managePrintBuffer() -> String {
         switch printBufferPolicy {
@@ -155,7 +155,8 @@ public final class LuaState {
             return printOutput
         case .truncateOldest:
             if printOutput.count > maxPrintBufferSize {
-                let startIndex = printOutput.index(printOutput.startIndex, offsetBy: printOutput.count - maxPrintBufferSize)
+                let offset = printOutput.count - maxPrintBufferSize
+                let startIndex = printOutput.index(printOutput.startIndex, offsetBy: offset)
                 printOutput = String(printOutput[startIndex...])
             }
             return printOutput
@@ -304,4 +305,3 @@ extension Array: LuaConvertible where Element: LuaConvertible {
         return array
     }
 }
-
