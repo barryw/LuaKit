@@ -320,14 +320,15 @@ async function main() {
     // Format version with Lua suffix
     const formattedVersion = formatVersionWithLua(analysis.new_version);
     
-    // Set GitHub Actions outputs
+    // Set GitHub Actions outputs (sanitize for single-line output)
+    const sanitize = (str) => str.replace(/\n/g, ' ').replace(/\r/g, '');
     console.log(`::set-output name=should_release::${analysis.should_release}`);
     console.log(`::set-output name=new_version::${analysis.new_version}`);
     console.log(`::set-output name=full_version::${formattedVersion}`);
     console.log(`::set-output name=lua_version::${getLuaVersion()}`);
     console.log(`::set-output name=release_type::${analysis.release_type}`);
-    console.log(`::set-output name=reasoning::${analysis.reasoning}`);
-    console.log(`::set-output name=changelog_summary::${analysis.changelog_summary}`);
+    console.log(`::set-output name=reasoning::${sanitize(analysis.reasoning)}`);
+    console.log(`::set-output name=changelog_summary::${sanitize(analysis.changelog_summary)}`);
     
     // Also write to environment file for newer GitHub Actions
     if (process.env.GITHUB_OUTPUT) {
@@ -337,8 +338,8 @@ async function main() {
         `full_version=${formattedVersion}`,
         `lua_version=${getLuaVersion()}`,
         `release_type=${analysis.release_type}`,
-        `reasoning=${analysis.reasoning}`,
-        `changelog_summary=${analysis.changelog_summary}`
+        `reasoning=${sanitize(analysis.reasoning)}`,
+        `changelog_summary=${sanitize(analysis.changelog_summary)}`
       ].join('\n');
       
       fs.appendFileSync(process.env.GITHUB_OUTPUT, outputs + '\n');
