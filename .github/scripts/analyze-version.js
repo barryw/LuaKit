@@ -14,10 +14,43 @@ if (!ANTHROPIC_API_KEY) {
 
 async function getLatestTag() {
   try {
-    const result = execSync('git describe --tags --abbrev=0', { encoding: 'utf8' });
-    return result.trim();
+    // Get all tags
+    const allTags = execSync('git tag -l', { encoding: 'utf8' })
+      .trim()
+      .split('\n')
+      .filter(tag => tag.length > 0);
+    
+    if (allTags.length === 0) {
+      console.log('No tags found');
+      return null;
+    }
+    
+    // Filter only semantic version tags (with or without +lua suffix)
+    const semverTags = allTags.filter(tag => /^\d+\.\d+\.\d+(\+lua\d+\.\d+\.\d+)?$/.test(tag));
+    
+    if (semverTags.length === 0) {
+      console.log('No semantic version tags found');
+      return null;
+    }
+    
+    // Sort by semantic version (extract main version for comparison)
+    semverTags.sort((a, b) => {
+      const versionA = a.replace(/\+lua[\d.]+$/, '').split('.').map(Number);
+      const versionB = b.replace(/\+lua[\d.]+$/, '').split('.').map(Number);
+      
+      for (let i = 0; i < 3; i++) {
+        if (versionA[i] !== versionB[i]) {
+          return versionB[i] - versionA[i]; // Descending order
+        }
+      }
+      return 0;
+    });
+    
+    const latestTag = semverTags[0];
+    console.log(`Found latest semantic version tag: ${latestTag}`);
+    return latestTag;
   } catch (error) {
-    console.log('No previous tags found');
+    console.log('Error getting tags:', error.message);
     return null;
   }
 }
