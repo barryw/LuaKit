@@ -82,14 +82,14 @@ jobs:
         PROFDATA_PATH=".build/$SWIFT_ARCH/release/codecov/default.profdata"
         
         # Find the test executable
-        TEST_BINARY=$(find .build/$SWIFT_ARCH/release -name "*.xctest" -type d | head -n 1)/Contents/MacOS/*
+        TEST_BINARY=$(find ".build/$SWIFT_ARCH/release" -name "*.xctest" -type d | head -n 1)/Contents/MacOS/*
         
         # Export coverage
         if [ -f "$PROFDATA_PATH" ] && [ -n "$TEST_BINARY" ]; then
           echo "Found profdata at: $PROFDATA_PATH"
           echo "Found test binary at: $TEST_BINARY"
           xcrun llvm-cov export -format="lcov" \
-            $TEST_BINARY \
+            "$TEST_BINARY" \
             -instr-profile "$PROFDATA_PATH" > coverage.lcov
         else
           echo "Warning: Coverage data not found"
@@ -212,7 +212,7 @@ jobs:
         git config user.email "github-actions[bot]@users.noreply.github.com"
         
         # Configure git to use the GitHub token for authentication
-        git config --local http.https://github.com/.extraheader "AUTHORIZATION: basic $(echo -n x-access-token:${{ secrets.GITHUB_TOKEN }} | base64)"
+        git config --local http.https://github.com/.extraheader "AUTHORIZATION: basic $(echo -n "x-access-token:${{ secrets.GITHUB_TOKEN }}" | base64)"
         
         TAG_NAME="${{ steps.version.outputs.full_version }}"
         
@@ -222,8 +222,8 @@ jobs:
           # Check if it exists on remote
           if git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME"; then
             echo "Tag $TAG_NAME already exists on remote. Skipping tag creation."
-            echo "tag_exists=true" >> $GITHUB_OUTPUT
-            echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+            echo "tag_exists=true" >> "$GITHUB_OUTPUT"
+            echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
             exit 0
           fi
         fi
@@ -233,8 +233,8 @@ jobs:
         git tag -a "$TAG_NAME" -m "LuaKit $TAG_NAME - Swift-Lua bridging with embedded Lua ${{ steps.version.outputs.lua_version }}"
         git push origin "$TAG_NAME"
         
-        echo "tag_exists=false" >> $GITHUB_OUTPUT
-        echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+        echo "tag_exists=false" >> "$GITHUB_OUTPUT"
+        echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
       id: create_tag
 
     - name: Create GitHub Release
@@ -296,8 +296,8 @@ jobs:
         text: |
           ✅ LuaKit CI/CD Pipeline Successful!
           
-          🎉 New release created: ${{ needs.auto-release.outputs.full_version }}
-          📝 All tests passed: ${{ needs.build-and-test.outputs.test_count }} tests
+          🎉 New release created successfully
+          📝 All tests passed
           🔍 Security scan: Clean
           🚀 Release deployed successfully
 
