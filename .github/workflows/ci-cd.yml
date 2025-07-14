@@ -285,6 +285,26 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Update logo with new version
+      if: steps.version.outputs.should_release == 'true' && steps.create_tag.outputs.tag_exists != 'true' && github.ref == 'refs/heads/main'
+      run: |
+        # Update the version in the logo SVG
+        sed -i '' "s/>v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*</>v${{ steps.version.outputs.new_version }}</" Images/luakit-logo.svg
+        
+        # Check if the file was actually modified
+        if git diff --quiet Images/luakit-logo.svg; then
+          echo "Logo already has the correct version"
+        else
+          # Commit and push the updated logo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Images/luakit-logo.svg
+          git commit -m "Update logo version to v${{ steps.version.outputs.new_version }}"
+          git push origin main
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   notify:
     name: Notify Status
     runs-on: ubuntu-latest
