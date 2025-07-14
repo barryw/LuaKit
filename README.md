@@ -1,8 +1,6 @@
 <div align="center">
   <img src="Images/luakit-logo.svg" alt="LuaKit Logo" width="200" height="200">
   
-  <h1>LuaKit</h1>
-  
   <p><strong>Seamless Swift ↔ Lua Bridging for iOS & macOS</strong></p>
   
   <p>
