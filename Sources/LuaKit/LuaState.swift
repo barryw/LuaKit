@@ -87,25 +87,25 @@ public final class LuaState {
                 } else {
                     let type = lua_type(L, i)
                     switch type {
-                        case LUA_TNIL:
-                            output += "nil"
-                        case LUA_TBOOLEAN:
-                            output += lua_toboolean(L, i) != 0 ? "true" : "false"
-                        case LUA_TNUMBER:
-                            if lua_isinteger(L, i) != 0 {
-                                output += String(lua_tointegerx(L, i, nil))
-                            } else {
-                                output += String(lua_tonumberx(L, i, nil))
-                            }
-                        case LUA_TSTRING:
-                            if let str = lua_tolstring(L, i, nil) {
-                                output += String(cString: str)
-                            }
-                        default:
-                            if let str = luaL_tolstring(L, i, nil) {
-                                output += String(cString: str)
-                                lua_settop(L, -2)
-                            }
+                    case LUA_TNIL:
+                        output += "nil"
+                    case LUA_TBOOLEAN:
+                        output += lua_toboolean(L, i) != 0 ? "true" : "false"
+                    case LUA_TNUMBER:
+                        if lua_isinteger(L, i) != 0 {
+                            output += String(lua_tointegerx(L, i, nil))
+                        } else {
+                            output += String(lua_tonumberx(L, i, nil))
+                        }
+                    case LUA_TSTRING:
+                        if let str = lua_tolstring(L, i, nil) {
+                            output += String(cString: str)
+                        }
+                    default:
+                        if let str = luaL_tolstring(L, i, nil) {
+                            output += String(cString: str)
+                            lua_settop(L, -2)
+                        }
                     }
                 }
             }

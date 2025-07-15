@@ -65,7 +65,7 @@ final class LuaGlobalRegistrationTests: XCTestCase {
         XCTAssertEqual(lua.globals["y"] as? Int, 20)
         XCTAssertEqual(lua.globals["name"] as? String, "Test")
         XCTAssertEqual(lua.globals["active"] as? Bool, true)
-        
+
         // Test they work in Lua calculations
         _ = try? lua.execute("result = tostring(x + y) .. ',' .. name .. ',' .. tostring(active)")
         XCTAssertEqual(lua.globals["result"] as? String, "30,Test,true")
@@ -285,7 +285,7 @@ final class LuaGlobalRegistrationTests: XCTestCase {
     func testPushValueWithVariousTypes() {
         // LuaFunction cannot be registered as global directly
         // It needs to be wrapped or used with registerFunction
-        
+
         // Test with nil (using Optional)
         lua.registerGlobals(["nilValue": Optional<Int>.none as Any])
         _ = try? lua.execute("nilResult = (nilValue == nil)")

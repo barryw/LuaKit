@@ -47,7 +47,7 @@ final class LuaPropertyValidationTests: XCTestCase {
         case .invalid:
             XCTFail("Expected valid result")
         }
-        
+
         switch validator.validate(0, propertyName: "age") {
         case .valid:
             break // expected
@@ -73,7 +73,7 @@ final class LuaPropertyValidationTests: XCTestCase {
         case .invalid:
             XCTFail("Expected valid result")
         }
-        
+
         switch validator.validate(100.0, propertyName: "percentage") {
         case .valid:
             break // expected
@@ -99,14 +99,14 @@ final class LuaPropertyValidationTests: XCTestCase {
         case .invalid:
             XCTFail("Expected valid result")
         }
-        
+
         switch validator.validate(1, propertyName: "rating") {
         case .valid:
             break // expected
         case .invalid:
             XCTFail("Expected valid result")
         }
-        
+
         switch validator.validate(10, propertyName: "rating") {
         case .valid:
             break // expected
@@ -142,7 +142,7 @@ final class LuaPropertyValidationTests: XCTestCase {
         case .invalid:
             XCTFail("Expected valid result")
         }
-        
+
         switch validator.validate("Test", propertyName: "name") {
         case .valid:
             break // expected
@@ -169,7 +169,7 @@ final class LuaPropertyValidationTests: XCTestCase {
         case .invalid:
             XCTFail("Expected valid result")
         }
-        
+
         switch validator.validate("test.user@domain.co.uk", propertyName: "email") {
         case .valid:
             break // expected
@@ -213,14 +213,14 @@ final class LuaPropertyValidationTests: XCTestCase {
         case .invalid:
             XCTFail("Expected valid result")
         }
-        
+
         switch validator.validate("inactive", propertyName: "status") {
         case .valid:
             break // expected
         case .invalid:
             XCTFail("Expected valid result")
         }
-        
+
         switch validator.validate("pending", propertyName: "status") {
         case .valid:
             break // expected

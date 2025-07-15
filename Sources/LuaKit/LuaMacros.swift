@@ -55,8 +55,8 @@ public enum LuaBridgeMode {
 /// ```
 @attached(member, names: named(luaNew), named(registerConstructor), named(registerMethods))
 public macro LuaBridgeable(mode: LuaBridgeMode = .automatic) = #externalMacro(
-    module: "LuaMacros",
-    type: "LuaBridgeableMacro"
+module: "LuaMacros",
+type: "LuaBridgeableMacro"
 )
 
 /// A macro that prevents a method or property from being exposed to Lua.
@@ -118,8 +118,8 @@ public macro LuaMethod() = #externalMacro(module: "LuaMacros", type: "LuaMethodM
 /// ```
 @attached(peer)
 public macro LuaProperty(readable: Bool = true, writable: Bool = false) = #externalMacro(
-    module: "LuaMacros",
-    type: "LuaPropertyMacro"
+module: "LuaMacros",
+type: "LuaPropertyMacro"
 )
 
 /// A macro that specifies constructor parameters for Lua object creation.

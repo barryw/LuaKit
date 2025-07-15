@@ -78,24 +78,24 @@ public struct LuaGlobals {
 
     private func pushValue(_ value: Any, to L: OpaquePointer) {
         switch value {
-            case let bool as Bool:
-                lua_pushboolean(L, bool ? 1 : 0)
-            case let int as Int:
-                lua_pushinteger(L, lua_Integer(int))
-            case let double as Double:
-                lua_pushnumber(L, double)
-            case let string as String:
-                lua_pushstring(L, string)
-            case let function as LuaFunction:
-                function.push(to: L)
-            case let bridgeable as LuaBridgeable:
-                pushBridgeable(bridgeable, to: L)
-            case let reference as LuaReference:
-                reference.push()
-            case let table as LuaTable:
-                table.push()
-            default:
-                lua_pushnil(L)
+        case let bool as Bool:
+            lua_pushboolean(L, bool ? 1 : 0)
+        case let int as Int:
+            lua_pushinteger(L, lua_Integer(int))
+        case let double as Double:
+            lua_pushnumber(L, double)
+        case let string as String:
+            lua_pushstring(L, string)
+        case let function as LuaFunction:
+            function.push(to: L)
+        case let bridgeable as LuaBridgeable:
+            pushBridgeable(bridgeable, to: L)
+        case let reference as LuaReference:
+            reference.push()
+        case let table as LuaTable:
+            table.push()
+        default:
+            lua_pushnil(L)
         }
     }
 
@@ -109,26 +109,26 @@ public struct LuaGlobals {
         let type = lua_type(L, index)
 
         switch type {
-            case LUA_TBOOLEAN:
-                return lua_toboolean(L, index) != 0
-            case LUA_TNUMBER:
-                if lua_isinteger(L, index) != 0 {
-                    return Int(lua_tointegerx(L, index, nil))
-                } else {
-                    return lua_tonumberx(L, index, nil)
-                }
-            case LUA_TSTRING:
-                if let cStr = lua_tolstring(L, index, nil) {
-                    return String(cString: cStr)
-                }
-            case LUA_TTABLE:
-                // Return as opaque handle for now
-                return "<table>"
-            case LUA_TUSERDATA:
-                // Could potentially extract the Swift object here
-                return "<userdata>"
-            default:
-                break
+        case LUA_TBOOLEAN:
+            return lua_toboolean(L, index) != 0
+        case LUA_TNUMBER:
+            if lua_isinteger(L, index) != 0 {
+                return Int(lua_tointegerx(L, index, nil))
+            } else {
+                return lua_tonumberx(L, index, nil)
+            }
+        case LUA_TSTRING:
+            if let cStr = lua_tolstring(L, index, nil) {
+                return String(cString: cStr)
+            }
+        case LUA_TTABLE:
+            // Return as opaque handle for now
+            return "<table>"
+        case LUA_TUSERDATA:
+            // Could potentially extract the Swift object here
+            return "<userdata>"
+        default:
+            break
         }
 
         return nil
@@ -253,24 +253,24 @@ public class LuaTable {
 
     private func pushValue(_ value: Any, to L: OpaquePointer) {
         switch value {
-            case let bool as Bool:
-                lua_pushboolean(L, bool ? 1 : 0)
-            case let int as Int:
-                lua_pushinteger(L, lua_Integer(int))
-            case let double as Double:
-                lua_pushnumber(L, double)
-            case let string as String:
-                lua_pushstring(L, string)
-            case let function as LuaFunction:
-                function.push(to: L)
-            case let bridgeable as LuaBridgeable:
-                pushBridgeable(bridgeable, to: L)
-            case let reference as LuaReference:
-                reference.push()
-            case let table as LuaTable:
-                table.push()
-            default:
-                lua_pushnil(L)
+        case let bool as Bool:
+            lua_pushboolean(L, bool ? 1 : 0)
+        case let int as Int:
+            lua_pushinteger(L, lua_Integer(int))
+        case let double as Double:
+            lua_pushnumber(L, double)
+        case let string as String:
+            lua_pushstring(L, string)
+        case let function as LuaFunction:
+            function.push(to: L)
+        case let bridgeable as LuaBridgeable:
+            pushBridgeable(bridgeable, to: L)
+        case let reference as LuaReference:
+            reference.push()
+        case let table as LuaTable:
+            table.push()
+        default:
+            lua_pushnil(L)
         }
     }
 
@@ -284,20 +284,20 @@ public class LuaTable {
         let type = lua_type(L, index)
 
         switch type {
-            case LUA_TBOOLEAN:
-                return lua_toboolean(L, index) != 0
-            case LUA_TNUMBER:
-                if lua_isinteger(L, index) != 0 {
-                    return Int(lua_tointegerx(L, index, nil))
-                } else {
-                    return lua_tonumberx(L, index, nil)
-                }
-            case LUA_TSTRING:
-                if let cStr = lua_tolstring(L, index, nil) {
-                    return String(cString: cStr)
-                }
-            default:
-                break
+        case LUA_TBOOLEAN:
+            return lua_toboolean(L, index) != 0
+        case LUA_TNUMBER:
+            if lua_isinteger(L, index) != 0 {
+                return Int(lua_tointegerx(L, index, nil))
+            } else {
+                return lua_tonumberx(L, index, nil)
+            }
+        case LUA_TSTRING:
+            if let cStr = lua_tolstring(L, index, nil) {
+                return String(cString: cStr)
+            }
+        default:
+            break
         }
 
         return nil

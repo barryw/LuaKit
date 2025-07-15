@@ -170,7 +170,7 @@ public class LuaPerformanceTracker {
             let avgTime = data.totalTime / Double(data.count) * 1_000 // Convert to ms
             let totalTime = data.totalTime * 1_000 // Convert to ms
             report += String(format: "%@: %d calls, %.2fms avg, %.2fms total\n",
-                           method, data.count, avgTime, totalTime)
+                             method, data.count, avgTime, totalTime)
         }
 
         return report
@@ -226,7 +226,7 @@ public class LuaMemoryTracker {
 
         return report
     }
-    
+
     /// Reset all allocations
     public static func reset() {
         lock.lock()

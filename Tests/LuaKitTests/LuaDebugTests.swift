@@ -10,7 +10,7 @@ import XCTest
 
 final class LuaDebugTests: XCTestCase {
     private var originalLogger: ((String, LuaDebugConfig.LogLevel) -> Void)?
-    
+
     override func setUp() {
         super.setUp()
         // Save original logger
@@ -308,7 +308,7 @@ final class LuaDebugTests: XCTestCase {
     func testMemoryTracking() {
         // Reset any existing allocations from other tests
         LuaMemoryTracker.reset()
-        
+
         var capturedMessages: [String] = []
         LuaDebugConfig.logger = { message, _ in
             capturedMessages.append(message)

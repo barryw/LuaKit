@@ -53,7 +53,7 @@ public class LuaFunction {
 
     /// Creates a Lua function from a Swift closure with two parameters
     public init<T1, T2, R>(_ closure: @escaping (T1, T2) -> R)
-        where T1: LuaConvertible, T2: LuaConvertible {
+    where T1: LuaConvertible, T2: LuaConvertible {
         LuaFunction.lock.lock()
         defer { LuaFunction.lock.unlock() }
 
@@ -74,7 +74,7 @@ public class LuaFunction {
 
     /// Creates a Lua function from a Swift closure with three parameters
     public init<T1, T2, T3, R>(_ closure: @escaping (T1, T2, T3) -> R)
-        where T1: LuaConvertible, T2: LuaConvertible, T3: LuaConvertible {
+    where T1: LuaConvertible, T2: LuaConvertible, T3: LuaConvertible {
         LuaFunction.lock.lock()
         defer { LuaFunction.lock.unlock() }
 
@@ -352,7 +352,7 @@ public extension LuaState {
 
     /// Registers a Swift closure with one parameter as a global Lua function
     func registerFunction<T1, R>(_ name: String, _ closure: @escaping (T1) -> R)
-        where T1: LuaConvertible {
+    where T1: LuaConvertible {
         let function = LuaFunction(closure)
         function.push(to: luaState)
         lua_setglobal(luaState, name)
@@ -360,7 +360,7 @@ public extension LuaState {
 
     /// Registers a Swift closure with two parameters as a global Lua function
     func registerFunction<T1, T2, R>(_ name: String, _ closure: @escaping (T1, T2) -> R)
-        where T1: LuaConvertible, T2: LuaConvertible {
+    where T1: LuaConvertible, T2: LuaConvertible {
         let function = LuaFunction(closure)
         function.push(to: luaState)
         lua_setglobal(luaState, name)
@@ -368,7 +368,7 @@ public extension LuaState {
 
     /// Registers a Swift closure with three parameters as a global Lua function
     func registerFunction<T1, T2, T3, R>(_ name: String, _ closure: @escaping (T1, T2, T3) -> R)
-        where T1: LuaConvertible, T2: LuaConvertible, T3: LuaConvertible {
+    where T1: LuaConvertible, T2: LuaConvertible, T3: LuaConvertible {
         let function = LuaFunction(closure)
         function.push(to: luaState)
         lua_setglobal(luaState, name)

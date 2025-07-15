@@ -533,4 +533,3 @@ final class LuaValueTests: XCTestCase {
         lua_pop(L, 2)
     }
 }
-

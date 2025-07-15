@@ -17,18 +17,18 @@ public enum LuaError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-            case .memoryAllocation:
-                return "Failed to allocate memory for Lua state"
-            case .syntax(let error):
-                return "Lua syntax error: \(error)"
-            case .runtime(let error):
-                return "Lua runtime error: \(error)"
-            case let .typeMismatch(expected, got):
-                return "Type mismatch: expected \(expected), got \(got)"
-            case .invalidArgument(let message):
-                return "Invalid argument: \(message)"
-            case .custom(let message):
-                return message
+        case .memoryAllocation:
+            return "Failed to allocate memory for Lua state"
+        case .syntax(let error):
+            return "Lua syntax error: \(error)"
+        case .runtime(let error):
+            return "Lua runtime error: \(error)"
+        case let .typeMismatch(expected, got):
+            return "Type mismatch: expected \(expected), got \(got)"
+        case .invalidArgument(let message):
+            return "Invalid argument: \(message)"
+        case .custom(let message):
+            return message
         }
     }
 }
