@@ -191,7 +191,7 @@ final class LuaGlobalsAdditionalCoverageTests: XCTestCase {
 
             valueBeforeDealloc = table?[1] as? String
             keyValueBeforeDealloc = table?["key"] as? String
-            
+
             XCTAssertEqual(valueBeforeDealloc, "first")
             XCTAssertEqual(keyValueBeforeDealloc, "value")
         }
