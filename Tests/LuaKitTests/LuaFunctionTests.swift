@@ -316,14 +316,14 @@ final class LuaFunctionTests: XCTestCase {
         let pushedType = lua_type(lua.luaState, -1)
         // LuaFunction is pushed as a table with __call metamethod
         XCTAssertEqual(pushedType, LUA_TTABLE)
-        
+
         // Verify it has the __call metamethod
         lua_getmetatable(lua.luaState, -1)
         XCTAssertNotEqual(lua_type(lua.luaState, -1), LUA_TNIL)
-        
+
         lua_getfield(lua.luaState, -1, "__call")
         XCTAssertEqual(lua_type(lua.luaState, -1), LUA_TFUNCTION)
-        
+
         lua_pop(lua.luaState, 3) // Pop __call, metatable, and function table
     }
 
@@ -376,4 +376,3 @@ final class LuaFunctionTests: XCTestCase {
         XCTAssertEqual(capturedValues?.2, true)
     }
 }
-
