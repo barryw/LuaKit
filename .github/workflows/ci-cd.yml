@@ -63,13 +63,10 @@ jobs:
           echo "ℹ️ No iOS Simulators available, skipping iOS build"
         fi
 
-    - name: Run Tests
-      run: swift test --configuration release --parallel
-
     - name: Run Tests with Coverage
       run: |
-        # Run tests with code coverage in debug mode (required for coverage)
-        swift test --enable-code-coverage
+        # Run tests with code coverage (using release mode for consistency with local development)
+        swift test --configuration release --enable-code-coverage --parallel
         
         # Detect architecture
         ARCH=$(uname -m)
@@ -79,11 +76,11 @@ jobs:
           SWIFT_ARCH="x86_64-apple-macosx"
         fi
         
-        # Find the profdata file (debug mode)
-        PROFDATA_PATH=".build/$SWIFT_ARCH/debug/codecov/default.profdata"
+        # Find the profdata file (release mode)
+        PROFDATA_PATH=".build/$SWIFT_ARCH/release/codecov/default.profdata"
         
-        # Find the test executable (debug mode)
-        XCTEST_BUNDLE=$(find ".build/$SWIFT_ARCH/debug" -name "*.xctest" -type d | head -n 1)
+        # Find the test executable (release mode)
+        XCTEST_BUNDLE=$(find ".build/$SWIFT_ARCH/release" -name "*.xctest" -type d | head -n 1)
         
         # Export coverage for all source files
         if [ -f "$PROFDATA_PATH" ] && [ -n "$XCTEST_BUNDLE" ]; then
