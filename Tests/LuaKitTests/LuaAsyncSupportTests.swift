@@ -160,7 +160,7 @@ final class LuaAsyncSupportTests: XCTestCase {
 
         // Test createAsyncHandle function
         _ = try? lua.execute("handleId = createAsyncHandle()")
-        
+
         let handleId = lua.globals["handleId"] as? String ?? ""
         XCTAssertFalse(handleId.isEmpty)
 
@@ -172,13 +172,14 @@ final class LuaAsyncSupportTests: XCTestCase {
         lua.registerAsyncSupport()
 
         // Create handle and set up completion
-        let handleId: String
         do {
-            handleId = try lua.execute("return createAsyncHandle()").trimmingCharacters(in: .whitespacesAndNewlines)
+            _ = try lua.execute("testHandleId = createAsyncHandle()")
         } catch {
             XCTFail("Failed to execute Lua: \(error)")
             return
         }
+        let handleId = lua.globals["testHandleId"] as? String ?? ""
+        XCTAssertFalse(handleId.isEmpty, "Expected valid handle ID")
         let uuid = UUID(uuidString: handleId)!
         let handle = LuaAsyncRegistry.get(uuid)!
 
@@ -208,13 +209,14 @@ final class LuaAsyncSupportTests: XCTestCase {
     func testCompleteAsyncWithError() {
         lua.registerAsyncSupport()
 
-        let handleId: String
         do {
-            handleId = try lua.execute("return createAsyncHandle()").trimmingCharacters(in: .whitespacesAndNewlines)
+            _ = try lua.execute("errorHandleId = createAsyncHandle()")
         } catch {
             XCTFail("Failed to execute Lua: \(error)")
             return
         }
+        let handleId = lua.globals["errorHandleId"] as? String ?? ""
+        XCTAssertFalse(handleId.isEmpty, "Expected valid handle ID")
         let uuid = UUID(uuidString: handleId)!
         let handle = LuaAsyncRegistry.get(uuid)!
 
@@ -329,20 +331,21 @@ final class LuaAsyncSupportTests: XCTestCase {
         }
 
         let script = """
-            local handleId = delayedGreeting('Lua')
+            handleId = delayedGreeting('Lua')
             -- In real usage, you'd set up a callback here
-            return handleId
         """
 
-        let result: String
         do {
-            result = try lua.execute(script)
+            _ = try lua.execute(script)
         } catch {
             XCTFail("Failed to execute Lua: \(error)")
             return
         }
-        let handleId = result.trimmingCharacters(in: .whitespacesAndNewlines)
-        XCTAssertNotNil(UUID(uuidString: handleId))
+
+        // Get the handle ID from globals
+        let handleId = lua.globals["handleId"] as? String ?? ""
+        XCTAssertFalse(handleId.isEmpty, "Expected non-empty handle ID")
+        XCTAssertNotNil(UUID(uuidString: handleId), "Expected valid UUID, got: '\(handleId)'")
     }
 
     func testAsyncPatternExample() {

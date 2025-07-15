@@ -226,6 +226,13 @@ public class LuaMemoryTracker {
 
         return report
     }
+    
+    /// Reset all allocations
+    public static func reset() {
+        lock.lock()
+        defer { lock.unlock() }
+        allocations.removeAll()
+    }
 }
 
 /// Extension to make debugging easier from Lua

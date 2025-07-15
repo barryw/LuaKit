@@ -24,6 +24,9 @@ final class LuaDebugTests: XCTestCase {
     override func tearDown() {
         // Clean up after tests
         LuaPerformanceTracker.reset()
+        LuaMemoryTracker.reset()
+        // Restore original logger
+        LuaDebugConfig.logger = originalLogger
         super.tearDown()
     }
 
@@ -303,6 +306,9 @@ final class LuaDebugTests: XCTestCase {
     // MARK: - LuaMemoryTracker Tests
 
     func testMemoryTracking() {
+        // Reset any existing allocations from other tests
+        LuaMemoryTracker.reset()
+        
         var capturedMessages: [String] = []
         LuaDebugConfig.logger = { message, _ in
             capturedMessages.append(message)

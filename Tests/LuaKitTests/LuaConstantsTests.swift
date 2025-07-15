@@ -120,16 +120,28 @@ final class LuaConstantsTests: XCTestCase {
         XCTAssertEqual(int1, 42)
         lua_pop(L, 1)
 
-        // Test with float (should truncate)
+        // Test with float (should return 0 - not an exact integer)
         lua_pushnumber(L, 3.14)
         let int2 = lua_tointeger(L, -1)
-        XCTAssertEqual(int2, 3)
+        XCTAssertEqual(int2, 0) // Lua 5.4 doesn't convert non-integer floats
         lua_pop(L, 1)
 
-        // Test with string (should return 0 - no automatic conversion)
+        // Test with integer-valued float (should convert)
+        lua_pushnumber(L, 5.0)
+        let int2b = lua_tointeger(L, -1)
+        XCTAssertEqual(int2b, 5) // Exact integer float converts
+        lua_pop(L, 1)
+
+        // Test with numeric string (should convert in Lua 5.4)
         lua_pushstring(L, "100")
         let int3 = lua_tointeger(L, -1)
-        XCTAssertEqual(int3, 0) // lua_tointeger doesn't convert strings
+        XCTAssertEqual(int3, 100) // Lua 5.4 converts numeric strings
+        lua_pop(L, 1)
+
+        // Test with non-numeric string (should return 0)
+        lua_pushstring(L, "hello")
+        let int4 = lua_tointeger(L, -1)
+        XCTAssertEqual(int4, 0) // Non-numeric strings return 0
         lua_pop(L, 1)
     }
 
