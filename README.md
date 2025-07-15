@@ -1,5 +1,3 @@
-# LuaKit
-
 <div align="center">
 
 ![LuaKit Logo](Images/luakit-logo.svg)
