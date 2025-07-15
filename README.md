@@ -9,6 +9,7 @@
 [![License](https://img.shields.io/badge/License-MIT-brightgreen.svg)](LICENSE)
 [![Latest Release](https://img.shields.io/github/v/release/barryw/LuaKit)](https://github.com/barryw/LuaKit/releases/latest)
 [![CI/CD](https://github.com/barryw/LuaKit/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/barryw/LuaKit/actions)
+[![codecov](https://codecov.io/gh/barryw/LuaKit/branch/main/graph/badge.svg)](https://codecov.io/gh/barryw/LuaKit)
 
 **Seamless Swift-Lua Integration**
 

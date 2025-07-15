@@ -68,7 +68,8 @@ jobs:
 
     - name: Run Tests with Coverage
       run: |
-        swift test --enable-code-coverage --configuration release
+        # Run tests with code coverage in debug mode (required for coverage)
+        swift test --enable-code-coverage
         
         # Detect architecture
         ARCH=$(uname -m)
@@ -78,36 +79,45 @@ jobs:
           SWIFT_ARCH="x86_64-apple-macosx"
         fi
         
-        # Find the profdata file
-        PROFDATA_PATH=".build/$SWIFT_ARCH/release/codecov/default.profdata"
+        # Find the profdata file (debug mode)
+        PROFDATA_PATH=".build/$SWIFT_ARCH/debug/codecov/default.profdata"
         
-        # Find the test executable
-        XCTEST_BUNDLE=$(find ".build/$SWIFT_ARCH/release" -name "*.xctest" -type d | head -n 1)
-        TEST_BINARY=$(find "$XCTEST_BUNDLE/Contents/MacOS" -type f -executable | head -n 1)
+        # Find the test executable (debug mode)
+        XCTEST_BUNDLE=$(find ".build/$SWIFT_ARCH/debug" -name "*.xctest" -type d | head -n 1)
         
-        # Export coverage
-        if [ -f "$PROFDATA_PATH" ] && [ -n "$TEST_BINARY" ] && [ -f "$TEST_BINARY" ]; then
+        # Export coverage for all source files
+        if [ -f "$PROFDATA_PATH" ] && [ -n "$XCTEST_BUNDLE" ]; then
           echo "Found profdata at: $PROFDATA_PATH"
-          echo "Found test binary at: $TEST_BINARY"
-          xcrun llvm-cov export -format="lcov" \
-            "$TEST_BINARY" \
-            -instr-profile "$PROFDATA_PATH" > coverage.lcov
+          echo "Found test bundle at: $XCTEST_BUNDLE"
+          
+          # Generate coverage report
+          xcrun llvm-cov export \
+            "$XCTEST_BUNDLE" \
+            -instr-profile="$PROFDATA_PATH" \
+            -format="lcov" \
+            -ignore-filename-regex=".build|Tests" \
+            > coverage.lcov
+          
+          echo "Coverage report generated successfully"
+          echo "Coverage file size: $(wc -c < coverage.lcov) bytes"
+          
+          # Also generate a human-readable report for debugging
+          echo "=== Coverage Summary ==="
+          xcrun llvm-cov report \
+            "$XCTEST_BUNDLE" \
+            -instr-profile="$PROFDATA_PATH" \
+            -ignore-filename-regex=".build|Tests" \
+            || echo "Failed to generate coverage summary"
         else
           echo "Warning: Coverage data not found"
           echo "Profdata path: $PROFDATA_PATH (exists: $([ -f "$PROFDATA_PATH" ] && echo "yes" || echo "no"))"
-          echo "Test binary path: $TEST_BINARY (exists: $([ -f "$TEST_BINARY" ] && echo "yes" || echo "no"))"
           echo "XCTest bundle: $XCTEST_BUNDLE"
           echo "Looking for profdata files..."
-          find .build -name "*.profdata" -type f || echo "No profdata files found"
-          echo "Looking for test executables..."
-          find .build -name "*.xctest" -type d || echo "No test executables found"
-          if [ -n "$XCTEST_BUNDLE" ] && [ -d "$XCTEST_BUNDLE" ]; then
-            echo "Contents of $XCTEST_BUNDLE/Contents/MacOS:"
-            ls -la "$XCTEST_BUNDLE/Contents/MacOS" || echo "MacOS directory not found"
-          fi
-          # Don't fail the build if coverage is not available
-          echo "Skipping coverage export"
-          touch coverage.lcov  # Create empty file so upload doesn't fail
+          find .build -name "*.profdata" -type f 2>/dev/null | head -10 || echo "No profdata files found"
+          echo "Looking for test bundles..."
+          find .build -name "*.xctest" -type d 2>/dev/null | head -10 || echo "No test bundles found"
+          # Create empty file so upload doesn't fail
+          touch coverage.lcov
         fi
 
     - name: Upload Coverage to Codecov
@@ -115,6 +125,10 @@ jobs:
       with:
         file: ./coverage.lcov
         token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: false
+        verbose: true
+        name: codecov-luakit
+        flags: unittests
 
     - name: Archive build artifacts
       uses: actions/upload-artifact@v4
