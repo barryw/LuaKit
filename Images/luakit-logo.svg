@@ -26,5 +26,5 @@
   <!-- Version badge -->
   <rect x="60" y="130" width="80" height="24" rx="12" fill="#4ecdc4" opacity="0.9"/>
   <text x="100" y="147" font-family="SF Pro Display, -apple-system, Arial" font-size="13" font-weight="600"
-        text-anchor="middle" fill="#1a1a2e">v1.5.11</text>
+        text-anchor="middle" fill="#1a1a2e">v1.5.12</text>
 </svg>
