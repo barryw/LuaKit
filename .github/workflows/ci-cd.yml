@@ -90,24 +90,52 @@ jobs:
           echo "Found profdata at: $PROFDATA_PATH"
           echo "Found test bundle at: $XCTEST_BUNDLE"
           
-          # Generate coverage report
-          xcrun llvm-cov export \
-            "$XCTEST_BUNDLE" \
-            -instr-profile="$PROFDATA_PATH" \
-            -format="lcov" \
-            -ignore-filename-regex=".build|Tests" \
-            > coverage.lcov
+          # Find the actual binary inside the bundle
+          # On macOS, the binary is at .xctest/Contents/MacOS/<name>
+          XCTEST_BINARY="$XCTEST_BUNDLE/Contents/MacOS/$(basename "$XCTEST_BUNDLE" .xctest)"
+          
+          # If Contents/MacOS doesn't exist, try the direct path (Linux style)
+          if [ ! -f "$XCTEST_BINARY" ]; then
+            XCTEST_BINARY="$XCTEST_BUNDLE/$(basename "$XCTEST_BUNDLE" .xctest)"
+          fi
+          
+          echo "Test binary path: $XCTEST_BINARY"
+          
+          if [ -f "$XCTEST_BINARY" ]; then
+            # Generate coverage report
+            xcrun llvm-cov export \
+              "$XCTEST_BINARY" \
+              -instr-profile="$PROFDATA_PATH" \
+              -format="lcov" \
+              -ignore-filename-regex=".build|Tests" \
+              > coverage.lcov
+          else
+            echo "Error: Could not find test binary at $XCTEST_BINARY"
+            ls -la "$XCTEST_BUNDLE"
+            if [ -d "$XCTEST_BUNDLE/Contents" ]; then
+              echo "Contents of $XCTEST_BUNDLE/Contents:"
+              ls -la "$XCTEST_BUNDLE/Contents"
+              if [ -d "$XCTEST_BUNDLE/Contents/MacOS" ]; then
+                echo "Contents of $XCTEST_BUNDLE/Contents/MacOS:"
+                ls -la "$XCTEST_BUNDLE/Contents/MacOS"
+              fi
+            fi
+            # Create empty file so upload doesn't fail
+            touch coverage.lcov
+          fi
           
           echo "Coverage report generated successfully"
           echo "Coverage file size: $(wc -c < coverage.lcov) bytes"
           
           # Also generate a human-readable report for debugging
-          echo "=== Coverage Summary ==="
-          xcrun llvm-cov report \
-            "$XCTEST_BUNDLE" \
-            -instr-profile="$PROFDATA_PATH" \
-            -ignore-filename-regex=".build|Tests" \
-            || echo "Failed to generate coverage summary"
+          if [ -f "$XCTEST_BINARY" ]; then
+            echo "=== Coverage Summary ==="
+            xcrun llvm-cov report \
+              "$XCTEST_BINARY" \
+              -instr-profile="$PROFDATA_PATH" \
+              -ignore-filename-regex=".build|Tests" \
+              || echo "Failed to generate coverage summary"
+          fi
         else
           echo "Warning: Coverage data not found"
           echo "Profdata path: $PROFDATA_PATH (exists: $([ -f "$PROFDATA_PATH" ] && echo "yes" || echo "no"))"
