@@ -165,10 +165,10 @@ final class LuaGlobalRegistrationTests: XCTestCase {
         lua.registerEnum(TestEnum.self, as: "Options")
 
         // Check enum values are available
-        let result = executeLua("""
-            return Options.opt1 .. ',' .. Options.opt2 .. ',' .. Options.opt3
+        _ = try? lua.execute("""
+            enumResult = Options.opt1 .. ',' .. Options.opt2 .. ',' .. Options.opt3
         """)
-        XCTAssertEqual(result.trimmingCharacters(in: .whitespacesAndNewlines), "opt1,opt2,opt3")
+        XCTAssertEqual(lua.globals["enumResult"] as? String, "opt1,opt2,opt3")
     }
 
     // MARK: - LuaNamespace Tests
@@ -178,10 +178,10 @@ final class LuaGlobalRegistrationTests: XCTestCase {
         namespace.register("value", 42)
         namespace.register("name", "TestName")
 
-        let result = executeLua("""
-            return Test.value .. ',' .. Test.name
+        _ = try? lua.execute("""
+            testResult = Test.value .. ',' .. Test.name
         """)
-        XCTAssertEqual(result.trimmingCharacters(in: .whitespacesAndNewlines), "42,TestName")
+        XCTAssertEqual(lua.globals["testResult"] as? String, "42,TestName")
     }
 
     // MARK: - LuaFunctionDocumentation Tests
@@ -229,14 +229,14 @@ final class LuaGlobalRegistrationTests: XCTestCase {
             }
             .build()
 
-        let versionResult = executeLua("return StringUtils.version")
-        XCTAssertEqual(versionResult.trimmingCharacters(in: .whitespacesAndNewlines), "1.0.0")
+        _ = try? lua.execute("versionResult = StringUtils.version")
+        XCTAssertEqual(lua.globals["versionResult"] as? String, "1.0.0")
 
-        let authorResult = executeLua("return StringUtils.author")
-        XCTAssertEqual(authorResult.trimmingCharacters(in: .whitespacesAndNewlines), "Test")
+        _ = try? lua.execute("authorResult = StringUtils.author")
+        XCTAssertEqual(lua.globals["authorResult"] as? String, "Test")
 
-        let funcResult = executeLua("return StringUtils.upper()")
-        XCTAssertEqual(funcResult.trimmingCharacters(in: .whitespacesAndNewlines), "TEST")
+        _ = try? lua.execute("funcResult = StringUtils.upper()")
+        XCTAssertEqual(lua.globals["funcResult"] as? String, "TEST")
     }
 
     // MARK: - Debug Logging Tests
@@ -288,7 +288,7 @@ final class LuaGlobalRegistrationTests: XCTestCase {
         
         // Test with nil (using Optional)
         lua.registerGlobals(["nilValue": Optional<Int>.none as Any])
-        let nilResult = executeLua("return nilValue == nil")
-        XCTAssertEqual(nilResult.trimmingCharacters(in: .whitespacesAndNewlines), "true")
+        _ = try? lua.execute("nilResult = (nilValue == nil)")
+        XCTAssertEqual(lua.globals["nilResult"] as? Bool, true)
     }
 }
