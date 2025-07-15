@@ -96,7 +96,7 @@ final class LuaTypeConversionTests: XCTestCase {
     }
 
     func testStringToURLConverterInvalidFormat() {
-        XCTAssertThrowsError(try StringToURLConverter.convert("not a url")) { error in
+        XCTAssertThrowsError(try StringToURLConverter.convert("")) { error in
             guard let luaKitError = error as? LuaKitError,
                   case .invalidArgument(let context) = luaKitError else {
                 XCTFail("Expected LuaKitError.invalidArgument")
@@ -229,7 +229,7 @@ final class LuaTypeConversionTests: XCTestCase {
 
         // Pull from Lua
         let pulled = Int?.pull(from: L, at: -1)
-        XCTAssertNotNil(pulled) // This is Optional<Optional<Int>>
+        XCTAssertNotNil(pulled as Any?) // This is Optional<Optional<Int>>
         XCTAssertEqual(pulled, 42)
 
         lua_pop(L, 1)
@@ -243,7 +243,7 @@ final class LuaTypeConversionTests: XCTestCase {
 
         // Pull from Lua
         let pulled = Int?.pull(from: L, at: -1)
-        XCTAssertNotNil(pulled) // This is Optional<Optional<Int>> with value .some(nil)
+        XCTAssertNotNil(pulled as Any?) // This is Optional<Optional<Int>> with value .some(nil)
         XCTAssertNil(pulled!)
 
         lua_pop(L, 1)

@@ -46,7 +46,12 @@ final class LuaEnumBridgingTests: XCTestCase {
     // Helper function to execute Lua code with error handling
     private func executeLua(_ code: String, file: StaticString = #file, line: UInt = #line) -> String {
         do {
-            return try lua.execute(code)
+            let result = try lua.execute(code)
+            // Debug print to see what's happening
+            if result.isEmpty {
+                print("WARNING: Lua execution returned empty result for code: \(code)")
+            }
+            return result
         } catch {
             XCTFail("Failed to execute Lua: \(error)", file: file, line: line)
             return ""
