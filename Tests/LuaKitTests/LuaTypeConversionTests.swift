@@ -222,7 +222,8 @@ final class LuaTypeConversionTests: XCTestCase {
     // MARK: - Optional LuaConvertible Tests
 
     func testOptionalLuaConvertibleSome() {
-        let optional: Int? = 42Int?.push(optional, to: L)
+        let optional: Int? = 42
+        Int?.push(optional, to: L)
 
         XCTAssertEqual(lua_tointeger(L, -1), 42)
 
@@ -235,7 +236,8 @@ final class LuaTypeConversionTests: XCTestCase {
     }
 
     func testOptionalLuaConvertibleNil() {
-        let optional: Int? = nilInt?.push(optional, to: L)
+        let optional: Int? = nil
+        Int?.push(optional, to: L)
 
         XCTAssertEqual(lua_type(L, -1), LUA_TNIL)
 
@@ -250,7 +252,8 @@ final class LuaTypeConversionTests: XCTestCase {
     // MARK: - Dictionary LuaConvertible Tests
 
     func testDictionaryLuaConvertible() {
-        let dict: [String: Int] = ["one": 1, "two": 2, "three": 3][String: Int].push(dict, to: L)
+        let dict: [String: Int] = ["one": 1, "two": 2, "three": 3]
+        [String: Int].push(dict, to: L)
 
         XCTAssertEqual(lua_type(L, -1), LUA_TTABLE)
 
@@ -339,7 +342,8 @@ final class LuaTypeConversionTests: XCTestCase {
             "uuid": "550e8400-e29b-41d4-a716-446655440000",
             "url": "https://example.com",
             "date": "2023-12-25T10:30:00.000Z"
-        ][String: String].push(dict, to: L)
+        ]
+        [String: String].push(dict, to: L)
 
         // Pull and verify
         let pulled = [String: String].pull(from: L, at: -1)
