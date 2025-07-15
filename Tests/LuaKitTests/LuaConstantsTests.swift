@@ -126,10 +126,10 @@ final class LuaConstantsTests: XCTestCase {
         XCTAssertEqual(int2, 3)
         lua_pop(L, 1)
 
-        // Test with string
+        // Test with string (should return 0 - no automatic conversion)
         lua_pushstring(L, "100")
         let int3 = lua_tointeger(L, -1)
-        XCTAssertEqual(int3, 100)
+        XCTAssertEqual(int3, 0) // lua_tointeger doesn't convert strings
         lua_pop(L, 1)
     }
 

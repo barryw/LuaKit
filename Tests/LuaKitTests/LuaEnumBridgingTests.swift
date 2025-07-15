@@ -97,53 +97,23 @@ final class LuaEnumBridgingTests: XCTestCase {
         lua.registerEnum(Direction.self)
 
         // Check that enum table exists
-        let result: String
-        do {
-            result = try lua.execute("""
-                return type(Direction) == 'table'
-            """)
-        } catch {
-            XCTFail("Failed to execute Lua: \(error)")
-            return
-        }
-        XCTAssertEqual(result.trimmingCharacters(in: .whitespacesAndNewlines), "true")
+        _ = try? lua.execute("""
+            directionTableExists = (type(Direction) == 'table')
+        """)
+        XCTAssertEqual(lua.globals["directionTableExists"] as? Bool, true)
 
         // Check all enum cases are available
-        let northCheck: String
-        do {
-            northCheck = try lua.execute("return Direction.north")
-        } catch {
-            XCTFail("Failed to execute Lua: \(error)")
-            return
-        }
-        XCTAssertEqual(northCheck.trimmingCharacters(in: .whitespacesAndNewlines), "north")
+        _ = try? lua.execute("northValue = Direction.north")
+        XCTAssertEqual(lua.globals["northValue"] as? String, "north")
 
-        let southCheck: String
-        do {
-            southCheck = try lua.execute("return Direction.south")
-        } catch {
-            XCTFail("Failed to execute Lua: \(error)")
-            return
-        }
-        XCTAssertEqual(southCheck.trimmingCharacters(in: .whitespacesAndNewlines), "south")
+        _ = try? lua.execute("southValue = Direction.south")
+        XCTAssertEqual(lua.globals["southValue"] as? String, "south")
 
-        let eastCheck: String
-        do {
-            eastCheck = try lua.execute("return Direction.east")
-        } catch {
-            XCTFail("Failed to execute Lua: \(error)")
-            return
-        }
-        XCTAssertEqual(eastCheck.trimmingCharacters(in: .whitespacesAndNewlines), "east")
+        _ = try? lua.execute("eastValue = Direction.east")
+        XCTAssertEqual(lua.globals["eastValue"] as? String, "east")
 
-        let westCheck: String
-        do {
-            westCheck = try lua.execute("return Direction.west")
-        } catch {
-            XCTFail("Failed to execute Lua: \(error)")
-            return
-        }
-        XCTAssertEqual(westCheck.trimmingCharacters(in: .whitespacesAndNewlines), "west")
+        _ = try? lua.execute("westValue = Direction.west")
+        XCTAssertEqual(lua.globals["westValue"] as? String, "west")
     }
 
     func testRegisterEnumWithCustomName() {

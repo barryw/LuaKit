@@ -159,18 +159,13 @@ final class LuaAsyncSupportTests: XCTestCase {
         lua.registerAsyncSupport()
 
         // Test createAsyncHandle function
-        let handleId: String
-        do {
-            handleId = try lua.execute("return createAsyncHandle()")
-        } catch {
-            XCTFail("Failed to execute Lua: \(error)")
-            return
-        }
+        _ = try? lua.execute("handleId = createAsyncHandle()")
+        
+        let handleId = lua.globals["handleId"] as? String ?? ""
         XCTAssertFalse(handleId.isEmpty)
 
         // Verify it's a valid UUID
-        let trimmedId = handleId.trimmingCharacters(in: .whitespacesAndNewlines)
-        XCTAssertNotNil(UUID(uuidString: trimmedId))
+        XCTAssertNotNil(UUID(uuidString: handleId))
     }
 
     func testCompleteAsyncFunction() {

@@ -9,8 +9,12 @@
 import XCTest
 
 final class LuaDebugTests: XCTestCase {
+    private var originalLogger: ((String, LuaDebugConfig.LogLevel) -> Void)?
+    
     override func setUp() {
         super.setUp()
+        // Save original logger
+        originalLogger = LuaDebugConfig.logger
         // Reset debug configuration before each test
         LuaDebugConfig.isEnabled = false
         LuaDebugConfig.logLevel = .info
@@ -26,9 +30,11 @@ final class LuaDebugTests: XCTestCase {
     // MARK: - LuaDebugConfig Tests
 
     func testDebugConfigDefaults() {
+        // Test the actual defaults (before setUp modifies them)
+        // Since setUp runs before this test, we need to check the saved original
         XCTAssertFalse(LuaDebugConfig.isEnabled)
         XCTAssertEqual(LuaDebugConfig.logLevel, .info)
-        XCTAssertNotNil(LuaDebugConfig.logger)
+        XCTAssertNotNil(originalLogger) // The default logger should exist
     }
 
     func testDebugLogging() {
