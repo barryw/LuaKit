@@ -42,21 +42,6 @@ final class LuaEnumBridgingTests: XCTestCase {
         lua = nil
         super.tearDown()
     }
-    
-    // Helper function to execute Lua code with error handling
-    private func executeLua(_ code: String, file: StaticString = #file, line: UInt = #line) -> String {
-        do {
-            let result = try lua.execute(code)
-            // Debug print to see what's happening
-            if result.isEmpty {
-                print("WARNING: Lua execution returned empty result for code: \(code)")
-            }
-            return result
-        } catch {
-            XCTFail("Failed to execute Lua: \(error)", file: file, line: line)
-            return ""
-        }
-    }
 
     // MARK: - LuaEnumBridgeable Protocol Tests
 
@@ -165,50 +150,44 @@ final class LuaEnumBridgingTests: XCTestCase {
         lua.registerEnum(Status.self, as: "CustomStatus")
 
         // Check that enum is registered with custom name
-        let result = executeLua("return type(CustomStatus) == 'table'")
-        XCTAssertEqual(result.trimmingCharacters(in: .whitespacesAndNewlines), "true")
+        _ = try? lua.execute("customStatusType = type(CustomStatus) == 'table'")
+        XCTAssertEqual(lua.globals["customStatusType"] as? Bool, true)
 
         // Check that default name uses luaTypeName
         lua.registerEnum(Status.self)
-        let defaultResult = executeLua("return type(GameStatus) == 'table'")
-        XCTAssertEqual(defaultResult.trimmingCharacters(in: .whitespacesAndNewlines), "true")
+        _ = try? lua.execute("gameStatusType = type(GameStatus) == 'table'")
+        XCTAssertEqual(lua.globals["gameStatusType"] as? Bool, true)
     }
 
     func testEnumValidationFunction() {
         lua.registerEnum(Direction.self)
 
         // Test validation function
-        let validResult = executeLua("""
-            return validateDirection('north')
+        _ = try? lua.execute("""
+            validResult = validateDirection('north')
         """)
-        XCTAssertEqual(validResult.trimmingCharacters(in: .whitespacesAndNewlines), "true")
+        XCTAssertEqual(lua.globals["validResult"] as? Bool, true)
 
-        let invalidResult: String
-        do {
-            invalidResult = try lua.execute("""
-                return validateDirection('northwest')
-            """)
-        } catch {
-            XCTFail("Failed to execute Lua: \(error)")
-            return
-        }
-        XCTAssertEqual(invalidResult.trimmingCharacters(in: .whitespacesAndNewlines), "false")
+        _ = try? lua.execute("""
+            invalidResult = validateDirection('northwest')
+        """)
+        XCTAssertEqual(lua.globals["invalidResult"] as? Bool, false)
     }
 
     func testEnumConversionFunction() {
         lua.registerEnum(Direction.self)
 
         // Test conversion function
-        let validConversion = executeLua("""
-            return toDirection('south')
+        _ = try? lua.execute("""
+            validConversion = toDirection('south')
         """)
-        XCTAssertEqual(validConversion.trimmingCharacters(in: .whitespacesAndNewlines), "south")
+        XCTAssertEqual(lua.globals["validConversion"] as? String, "south")
 
         // Invalid conversion returns nil
-        let invalidConversion = executeLua("""
-            return toDirection('invalid') == nil
+        _ = try? lua.execute("""
+            invalidConversion = toDirection('invalid') == nil
         """)
-        XCTAssertEqual(invalidConversion.trimmingCharacters(in: .whitespacesAndNewlines), "true")
+        XCTAssertEqual(lua.globals["invalidConversion"] as? Bool, true)
     }
 
     // MARK: - LuaEnumValidator Tests
@@ -278,11 +257,11 @@ final class LuaEnumBridgingTests: XCTestCase {
                 end
             end
 
-            return move(Direction.north)
+            result = move(Direction.north)
         """
 
-        let result = executeLua(script)
-        XCTAssertEqual(result.trimmingCharacters(in: .whitespacesAndNewlines), "Moving north")
+        _ = try? lua.execute(script)
+        XCTAssertEqual(lua.globals["result"] as? String, "Moving north")
     }
 
     func testEnumWithBridgeableClass() {
@@ -310,10 +289,10 @@ final class LuaEnumBridgingTests: XCTestCase {
         // Test that accessing invalid enum value doesn't crash
         let script = """
             local dir = Direction.invalid_direction
-            return dir == nil
+            result = (dir == nil)
         """
 
-        let result = executeLua(script)
-        XCTAssertEqual(result.trimmingCharacters(in: .whitespacesAndNewlines), "true")
+        _ = try? lua.execute(script)
+        XCTAssertEqual(lua.globals["result"] as? Bool, true)
     }
 }

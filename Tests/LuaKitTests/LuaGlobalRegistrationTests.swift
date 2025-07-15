@@ -25,44 +25,25 @@ final class LuaGlobalRegistrationTests: XCTestCase {
         lua = nil
         super.tearDown()
     }
-    
-    // Helper function to execute Lua code with error handling
-    private func executeLua(_ code: String, file: StaticString = #file, line: UInt = #line) -> String {
-        do {
-            let result = try lua.execute(code)
-            // Debug print to see what's happening
-            if result.isEmpty {
-                print("WARNING: Lua execution returned empty result for code: \(code)")
-            }
-            return result
-        } catch {
-            XCTFail("Failed to execute Lua: \(error)", file: file, line: line)
-            return ""
-        }
-    }
 
     // MARK: - Type-safe Global Registration Tests
 
     func testRegisterGlobalBasicTypes() {
         // Test Bool
         lua.registerGlobal("testBool", true)
-        let boolResult = executeLua("return testBool")
-        XCTAssertEqual(boolResult.trimmingCharacters(in: .whitespacesAndNewlines), "true")
+        XCTAssertEqual(lua.globals["testBool"] as? Bool, true)
 
         // Test Int
         lua.registerGlobal("testInt", 42)
-        let intResult = executeLua("return testInt")
-        XCTAssertEqual(intResult.trimmingCharacters(in: .whitespacesAndNewlines), "42")
+        XCTAssertEqual(lua.globals["testInt"] as? Int, 42)
 
         // Test Double
         lua.registerGlobal("testDouble", 3.14)
-        let doubleResult = executeLua("return testDouble")
-        XCTAssertEqual(doubleResult.trimmingCharacters(in: .whitespacesAndNewlines), "3.14")
+        XCTAssertEqual(lua.globals["testDouble"] as? Double, 3.14)
 
         // Test String
         lua.registerGlobal("testString", "Hello, Lua!")
-        let stringResult = executeLua("return testString")
-        XCTAssertEqual(stringResult.trimmingCharacters(in: .whitespacesAndNewlines), "Hello, Lua!")
+        XCTAssertEqual(lua.globals["testString"] as? String, "Hello, Lua!")
     }
 
     func testRegisterGlobalBridgeable() {
@@ -79,10 +60,15 @@ final class LuaGlobalRegistrationTests: XCTestCase {
             "active": true
         ])
 
-        let result = executeLua("""
-            return x + y .. ',' .. name .. ',' .. tostring(active)
-        """)
-        XCTAssertEqual(result.trimmingCharacters(in: .whitespacesAndNewlines), "30,Test,true")
+        // Verify each global was registered
+        XCTAssertEqual(lua.globals["x"] as? Int, 10)
+        XCTAssertEqual(lua.globals["y"] as? Int, 20)
+        XCTAssertEqual(lua.globals["name"] as? String, "Test")
+        XCTAssertEqual(lua.globals["active"] as? Bool, true)
+        
+        // Test they work in Lua calculations
+        _ = try? lua.execute("result = tostring(x + y) .. ',' .. name .. ',' .. tostring(active)")
+        XCTAssertEqual(lua.globals["result"] as? String, "30,Test,true")
     }
 
     // MARK: - Namespace Tests
@@ -93,29 +79,30 @@ final class LuaGlobalRegistrationTests: XCTestCase {
         XCTAssertEqual(namespace.name, "MyModule")
 
         // Verify namespace exists as table
-        let result = executeLua("return type(MyModule)")
-        XCTAssertEqual(result.trimmingCharacters(in: .whitespacesAndNewlines), "table")
+        _ = try? lua.execute("namespaceType = type(MyModule)")
+        XCTAssertEqual(lua.globals["namespaceType"] as? String, "table")
     }
 
     func testRegisterInNamespace() {
-        lua.registerNamespace("Math")
+        _ = lua.registerNamespace("Math")
         lua.registerInNamespace("Math", name: "PI", value: 3.14159)
         lua.registerInNamespace("Math", name: "E", value: 2.71828)
 
-        let result = executeLua("""
-            return Math.PI .. ',' .. Math.E
-        """)
-        XCTAssertEqual(result.trimmingCharacters(in: .whitespacesAndNewlines), "3.14159,2.71828")
+        // Test that values are accessible via namespace
+        _ = try? lua.execute("pi_value = Math.PI; e_value = Math.E")
+        XCTAssertEqual(lua.globals["pi_value"] as? Double, 3.14159)
+        XCTAssertEqual(lua.globals["e_value"] as? Double, 2.71828)
     }
 
     func testNamespaceWithFunction() {
-        lua.registerNamespace("Utils")
+        _ = lua.registerNamespace("Utils")
         lua.registerInNamespace("Utils", name: "double", value: LuaFunction { (number: Int) in
             return number * 2
         })
 
-        let result = executeLua("return Utils.double(21)")
-        XCTAssertEqual(result.trimmingCharacters(in: .whitespacesAndNewlines), "42")
+        // Test the function works
+        _ = try? lua.execute("doubled = Utils.double(21)")
+        XCTAssertEqual(lua.globals["doubled"] as? Int, 42)
     }
 
     func testNestedNamespace() {
@@ -154,8 +141,8 @@ final class LuaGlobalRegistrationTests: XCTestCase {
         )
 
         // Test the function works
-        let result = executeLua("return calculate(10, 5, '+')")
-        XCTAssertEqual(result.trimmingCharacters(in: .whitespacesAndNewlines), "15.0")
+        _ = try? lua.execute("calc_result = calculate(10, 5, '+')")
+        XCTAssertEqual(lua.globals["calc_result"] as? Double, 15.0)
 
         // Check documentation was stored
         let docKey = "__luakit_doc_calculate"
@@ -280,19 +267,19 @@ final class LuaGlobalRegistrationTests: XCTestCase {
         // Should create namespace automatically
         lua.registerInNamespace("AutoCreated", name: "value", value: 42)
 
-        let result = executeLua("return AutoCreated.value")
-        XCTAssertEqual(result.trimmingCharacters(in: .whitespacesAndNewlines), "42")
+        _ = try? lua.execute("auto_value = AutoCreated.value")
+        XCTAssertEqual(lua.globals["auto_value"] as? Int, 42)
     }
 
     func testOverwriteNamespace() {
-        lua.registerNamespace("Test")
+        _ = lua.registerNamespace("Test")
         lua.registerInNamespace("Test", name: "value", value: 1)
 
         // Overwrite with new value
         lua.registerInNamespace("Test", name: "value", value: 2)
 
-        let result = executeLua("return Test.value")
-        XCTAssertEqual(result.trimmingCharacters(in: .whitespacesAndNewlines), "2")
+        _ = try? lua.execute("test_value2 = Test.value")
+        XCTAssertEqual(lua.globals["test_value2"] as? Int, 2)
     }
 
     func testPushValueWithVariousTypes() {
