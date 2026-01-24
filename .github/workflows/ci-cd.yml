@@ -327,18 +327,28 @@ jobs:
     - name: Update logo with new version
       if: steps.version.outputs.should_release == 'true' && steps.create_tag.outputs.tag_exists != 'true' && github.ref == 'refs/heads/main'
       run: |
+        VERSION="${{ steps.version.outputs.new_version }}"
+
         # Update the version in the logo SVG
-        sed -i '' "s/>v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*</>v${{ steps.version.outputs.new_version }}</" Images/luakit-logo.svg
-        
-        # Check if the file was actually modified
-        if git diff --quiet Images/luakit-logo.svg; then
-          echo "Logo already has the correct version"
+        sed -i '' "s/>v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*</>v${VERSION}</" Images/luakit-logo.svg
+
+        # Update the README cache-buster to force GitHub to reload the logo
+        sed -i '' "s/luakit-logo\.svg?v=[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/luakit-logo.svg?v=${VERSION}/" README.md
+
+        # If no cache-buster exists, add one
+        if ! grep -q "luakit-logo.svg?v=" README.md; then
+          sed -i '' "s/luakit-logo\.svg)/luakit-logo.svg?v=${VERSION})/" README.md
+        fi
+
+        # Check if any files were modified
+        if git diff --quiet Images/luakit-logo.svg README.md; then
+          echo "Logo and README already have the correct version"
         else
-          # Commit and push the updated logo
+          # Commit and push the updates
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Images/luakit-logo.svg
-          git commit -m "chore: update logo version to v${{ steps.version.outputs.new_version }}"
+          git add Images/luakit-logo.svg README.md
+          git commit -m "chore: update logo version to v${VERSION}"
           git push origin main
         fi
       env:
