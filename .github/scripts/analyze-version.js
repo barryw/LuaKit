@@ -126,12 +126,21 @@ function getLuaVersion() {
     const luaHeaderPath = 'Sources/Lua/include/lua.h';
     if (fs.existsSync(luaHeaderPath)) {
       const headerContent = fs.readFileSync(luaHeaderPath, 'utf8');
-      
-      // Extract version components from Lua header
-      const majorMatch = headerContent.match(/#define\s+LUA_VERSION_MAJOR\s+"(\d+)"/);
-      const minorMatch = headerContent.match(/#define\s+LUA_VERSION_MINOR\s+"(\d+)"/);
-      const releaseMatch = headerContent.match(/#define\s+LUA_VERSION_RELEASE\s+"(\d+)"/);
-      
+
+      // Try Lua 5.5+ format first (LUA_VERSION_*_N as numeric defines)
+      let majorMatch = headerContent.match(/#define\s+LUA_VERSION_MAJOR_N\s+(\d+)/);
+      let minorMatch = headerContent.match(/#define\s+LUA_VERSION_MINOR_N\s+(\d+)/);
+      let releaseMatch = headerContent.match(/#define\s+LUA_VERSION_RELEASE_N\s+(\d+)/);
+
+      if (majorMatch && minorMatch && releaseMatch) {
+        return `${majorMatch[1]}.${minorMatch[1]}.${releaseMatch[1]}`;
+      }
+
+      // Fallback to Lua 5.4 format (LUA_VERSION_* as string defines)
+      majorMatch = headerContent.match(/#define\s+LUA_VERSION_MAJOR\s+"(\d+)"/);
+      minorMatch = headerContent.match(/#define\s+LUA_VERSION_MINOR\s+"(\d+)"/);
+      releaseMatch = headerContent.match(/#define\s+LUA_VERSION_RELEASE\s+"(\d+)"/);
+
       if (majorMatch && minorMatch && releaseMatch) {
         return `${majorMatch[1]}.${minorMatch[1]}.${releaseMatch[1]}`;
       }
@@ -139,9 +148,9 @@ function getLuaVersion() {
   } catch (error) {
     console.log('Could not parse Lua version from header, using fallback');
   }
-  
+
   // Fallback to known version
-  return '5.4.8';
+  return '5.5.0';
 }
 
 function formatVersionWithLua(semanticVersion) {
