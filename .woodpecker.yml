@@ -69,10 +69,10 @@ steps:
       - "VERSION=$(echo $LATEST_TAG | sed 's/+.*//')"
       - "test -n \"$VERSION\" || { echo No version found; exit 0; }"
       - "echo Updating assets to version $VERSION"
-      - "sed -i '' \"s/>v[0-9]*\\.[0-9]*\\.[0-9]*</>v${VERSION}</\" Images/luakit-logo.svg"
+      - 'sed -i "" "s/>v[0-9]*\.[0-9]*\.[0-9]*</>v${VERSION}</" Images/luakit-logo.svg'
       - "CACHE_BUST=$(date +%Y%m%d%H%M)"
-      - "sed -i '' \"s/luakit-logo\\.svg?r=[0-9]*/luakit-logo.svg?r=${CACHE_BUST}/\" README.md"
-      - "sed -i '' \"s/from: \\\"[0-9]*\\.[0-9]*\\.[0-9]*\\\"/from: \\\"${VERSION}\\\"/\" README.md"
+      - 'sed -i "" "s/luakit-logo\.svg?r=[0-9]*/luakit-logo.svg?r=${CACHE_BUST}/" README.md'
+      - 'sed -i "" "s/from: \"[0-9]*\.[0-9]*\.[0-9]*\"/from: \"${VERSION}\"/" README.md'
       - "git diff --quiet Images/luakit-logo.svg README.md || git add Images/luakit-logo.svg README.md"
       - "git diff --cached --quiet || git commit -m \"chore: update logo version to v${VERSION}\""
       - "git diff --cached --quiet || git push origin main"
