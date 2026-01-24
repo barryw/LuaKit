@@ -9,7 +9,8 @@ import Foundation
 import Lua
 
 // Lua constants that are defined as macros and not available in Swift
-public let luaRegistryIndex: Int32 = -1_001_000  // -LUAI_MAXSTACK - 1000, where LUAI_MAXSTACK = 1000000
+// Lua 5.5 changed LUA_REGISTRYINDEX from -1001000 to -(INT_MAX/2 + 1000)
+public let luaRegistryIndex: Int32 = -(Int32.max / 2 + 1000)
 
 // Helper functions for macros
 public func lua_pop(_ L: OpaquePointer, _ n: Int32) {

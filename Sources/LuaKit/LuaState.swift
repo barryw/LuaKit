@@ -19,7 +19,39 @@ public final class LuaState {
             throw LuaError.memoryAllocation
         }
         self.L = state
-        luaL_openlibs(L)
+        // Lua 5.5.0: luaL_openlibs is now a macro, call underlying function directly
+        luaL_openselectedlibs(L, ~0, 0)
+        setupPrintCapture()
+        registerArrayProxyTypes()
+    }
+
+    /// Initialize a Lua state with selective library loading.
+    ///
+    /// This initializer allows you to control which standard libraries are loaded,
+    /// enabling sandboxed execution environments that don't have access to potentially
+    /// dangerous functionality like file I/O or OS commands.
+    ///
+    /// - Parameter libraries: The libraries to load. Use `.all` for all libraries,
+    ///   `.sandboxed` for a safe subset, or a custom combination.
+    ///
+    /// Example:
+    /// ```swift
+    /// // Full access (equivalent to LuaState())
+    /// let lua = try LuaState(libraries: .all)
+    ///
+    /// // Sandboxed - no io, os, debug, package
+    /// let sandbox = try LuaState(libraries: .sandboxed)
+    ///
+    /// // Custom selection
+    /// let custom = try LuaState(libraries: [.base, .string, .math])
+    /// ```
+    public init(libraries: LuaLibrary) throws {
+        guard let state = luaL_newstate() else {
+            throw LuaError.memoryAllocation
+        }
+        self.L = state
+        // Lua 5.5.0: Use luaL_openselectedlibs with the library bitmask
+        luaL_openselectedlibs(L, Int32(libraries.rawValue), 0)
         setupPrintCapture()
         registerArrayProxyTypes()
     }

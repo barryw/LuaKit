@@ -22,7 +22,7 @@ LuaKit is a Swift framework that provides seamless two-way bridging between Swif
 ### ✨ Key Features
 
 - 🔗 **Automatic Swift-Lua bridging** with the `@LuaBridgeable` macro
-- 📦 **Lua 5.4.8 embedded** - no external dependencies
+- 📦 **Lua 5.5.0 embedded** - no external dependencies
 - 🚀 **Type-safe** conversions between Swift and Lua
 - 🎯 **Simple API** - get started in minutes
 - 🔄 **Two-way communication** - call Lua from Swift and vice versa
@@ -114,7 +114,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ## Credits
 
-LuaKit embeds Lua 5.4.8. Lua is a powerful, efficient, lightweight, embeddable scripting language. Learn more at [lua.org](https://www.lua.org).
+LuaKit embeds Lua 5.5.0. Lua is a powerful, efficient, lightweight, embeddable scripting language. Learn more at [lua.org](https://www.lua.org).
 
 <div align="center">
 <img src="https://www.lua.org/images/lua-logo.gif" alt="Lua Logo" width="128">

@@ -4,8 +4,8 @@ This document provides essential information for Claude AI instances working on 
 
 ## Project Overview
 
-**LuaKit v1.3.0** - A Swift framework that:
-- Embeds Lua 5.4.8 directly (no external dependencies)
+**LuaKit** - A Swift framework that:
+- Embeds Lua 5.5.0 directly (no external dependencies)
 - Provides seamless Swift-Lua bridging via the `@LuaBridgeable` macro
 - Supports iOS 13+, macOS 10.15+, tvOS 13+, watchOS 6+
 - Features AI-powered semantic versioning via Claude API integration
@@ -40,7 +40,7 @@ xcodebuild -scheme LuaKit -destination 'generic/platform=iOS' -configuration Rel
 ```
 LuaKit/
 ├── Sources/
-│   ├── Lua/              # Embedded Lua 5.4.8 C source
+│   ├── Lua/              # Embedded Lua 5.5.0 C source
 │   ├── LuaKit/           # Main Swift framework
 │   │   ├── LuaBridgeable/    # Core bridging protocols
 │   │   └── ...
@@ -123,7 +123,7 @@ Supports bridging of Swift arrays to Lua:
 
 ### AI Version Management
 - Uses Claude API to analyze commits and determine version bumps
-- Format: `x.x.x+luax.x.x` (e.g., `1.3.0+lua5.4.8`)
+- Format: `x.x.x+luax.x.x` (e.g., `1.6.0+lua5.5.0`)
 - Semantic versioning based on change analysis
 
 ## Development Guidelines
@@ -171,7 +171,7 @@ When modifying `@LuaBridgeable` macro:
 
 ## Important Constants
 
-- `luaRegistryIndex`: -1,001,000 (was LUA_REGISTRYINDEX, renamed for SwiftLint)
+- `luaRegistryIndex`: -(Int32.max / 2 + 1000) (was LUA_REGISTRYINDEX, renamed for SwiftLint; changed in Lua 5.5.0 from -1,001,000)
 - Lua type constants: `LUA_TNIL`, `LUA_TBOOLEAN`, etc.
 
 ## Security Considerations
@@ -208,6 +208,8 @@ When modifying `@LuaBridgeable` macro:
 
 ## Version History
 
+- (Next): Upgraded to Lua 5.5.0, added selective library loading API
+- v1.5.x: Test coverage improvements, bug fixes
 - v1.3.0: Added 15 major enhancements, AI-powered versioning
 - v1.2.1: Fixed EXC_BAD_ACCESS crash
 - v1.2.0: Enhanced @LuaBridgeable macro capabilities
@@ -215,4 +217,4 @@ When modifying `@LuaBridgeable` macro:
 - v1.0.0: Initial release
 
 ---
-Last Updated: 2025-07-12
+Last Updated: 2026-01-23
