@@ -10,20 +10,20 @@ labels:
 
 clone:
   git:
-    image: dummy
+    image: bash
     settings:
       lfs: false
 
 steps:
   - name: build
-    image: dummy
+    image: bash
     commands:
       - echo "=== Building LuaKit ==="
       - swift build --configuration release
       - echo "=== Build Complete ==="
 
   - name: test
-    image: dummy
+    image: bash
     depends_on: [build]
     commands:
       - echo "=== Running Tests ==="
@@ -31,21 +31,21 @@ steps:
       - echo "=== Tests Complete ==="
 
   - name: lint
-    image: dummy
+    image: bash
     commands:
       - echo "=== Running SwiftLint ==="
       - swiftlint lint --quiet
       - echo "=== Lint Complete ==="
 
   - name: security
-    image: dummy
+    image: bash
     commands:
       - echo "=== Security Scan ==="
       - swift package show-dependencies --format json > dependencies.json
       - echo "=== Security Scan Complete ==="
 
   - name: release
-    image: dummy
+    image: bash
     depends_on: [build, test, lint]
     when:
       - event: push
@@ -68,7 +68,7 @@ steps:
       - echo "=== Release Created ==="
 
   - name: update-version-assets
-    image: dummy
+    image: bash
     depends_on: [release]
     when:
       - event: push
