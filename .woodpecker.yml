@@ -5,16 +5,17 @@ when:
   - event: [push, pull_request]
     branch: [main, develop]
 
+labels:
+  backend: local
+
 steps:
   - name: build
-    image: local
     commands:
       - echo "=== Building LuaKit ==="
       - swift build --configuration release
       - echo "=== Build Complete ==="
 
   - name: test
-    image: local
     depends_on: [build]
     commands:
       - echo "=== Running Tests ==="
@@ -22,21 +23,18 @@ steps:
       - echo "=== Tests Complete ==="
 
   - name: lint
-    image: local
     commands:
       - echo "=== Running SwiftLint ==="
       - swiftlint lint --quiet
       - echo "=== Lint Complete ==="
 
   - name: security
-    image: local
     commands:
       - echo "=== Security Scan ==="
       - swift package show-dependencies --format json > dependencies.json
       - echo "=== Security Scan Complete ==="
 
   - name: release
-    image: local
     depends_on: [build, test, lint]
     when:
       - event: push
@@ -59,7 +57,6 @@ steps:
       - echo "=== Release Created ==="
 
   - name: update-version-assets
-    image: local
     depends_on: [release]
     when:
       - event: push
