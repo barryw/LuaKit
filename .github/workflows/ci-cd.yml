@@ -341,6 +341,9 @@ jobs:
           sed -i '' "s/luakit-logo\.svg)/luakit-logo.svg?r=${CACHE_BUST})/" README.md
         fi
 
+        # Update the installation version in README
+        sed -i '' "s/from: \"[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\"/from: \"${VERSION}\"/" README.md
+
         # Check if any files were modified
         if git diff --quiet Images/luakit-logo.svg README.md; then
           echo "Logo and README already have the correct version"

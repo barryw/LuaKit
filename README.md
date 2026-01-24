@@ -34,7 +34,7 @@ Add LuaKit to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/barryw/LuaKit", from: "1.5.4")
+    .package(url: "https://github.com/barryw/LuaKit", from: "1.6.1")
 ]
 ```
 
