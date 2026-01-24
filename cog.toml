@@ -9,7 +9,8 @@ tag_prefix = ""
 # Post-bump hooks to add Lua version suffix to tag
 # Must be at root level, before any [sections]
 post_bump_hooks = [
-    "sh -c 'LUA_VER=$(grep LUA_VERSION_MAJOR Sources/Lua/include/lua.h | head -1 | grep -o \"[0-9]\").$(grep LUA_VERSION_MINOR Sources/Lua/include/lua.h | head -1 | grep -o \"[0-9]\").$(grep LUA_VERSION_RELEASE Sources/Lua/include/lua.h | head -1 | grep -o \"[0-9]\") && git tag -d {{version}} && git tag -a {{version}}+lua${LUA_VER} -m \"LuaKit {{version}}+lua${LUA_VER}\"'",
+    # Lua 5.5+ uses LUA_VERSION_*_N defines instead of LUA_VERSION_*
+    "sh -c 'LUA_VER=$(grep LUA_VERSION_MAJOR_N Sources/Lua/include/lua.h | head -1 | grep -o \"[0-9]\").$(grep LUA_VERSION_MINOR_N Sources/Lua/include/lua.h | head -1 | grep -o \"[0-9]\").$(grep LUA_VERSION_RELEASE_N Sources/Lua/include/lua.h | head -1 | grep -o \"[0-9]\") && git tag -d {{version}} && git tag -a {{version}}+lua${LUA_VER} -m \"LuaKit {{version}}+lua${LUA_VER}\"'",
 ]
 
 [git_hooks.commit-msg]
