@@ -15,7 +15,7 @@ final class LuaConstantsTests: XCTestCase {
     override func setUp() {
         super.setUp()
         L = luaL_newstate()
-        luaL_openlibs(L)
+        luaL_openselectedlibs(L, ~0, 0)
     }
 
     override func tearDown() {
@@ -25,8 +25,9 @@ final class LuaConstantsTests: XCTestCase {
     }
 
     func testLuaRegistryIndex() {
-        // Test that luaRegistryIndex is correctly defined
-        XCTAssertEqual(luaRegistryIndex, -1_001_000)
+        // Test that luaRegistryIndex is correctly defined for Lua 5.5
+        // Lua 5.5 changed LUA_REGISTRYINDEX from -1001000 to -(INT_MAX/2 + 1000)
+        XCTAssertEqual(luaRegistryIndex, -(Int32.max / 2 + 1000))
 
         // Test that we can use it with registry operations
         lua_pushstring(L, "test_value")

@@ -15,7 +15,7 @@ final class LuaErrorContextTests: XCTestCase {
     override func setUp() {
         super.setUp()
         L = luaL_newstate()
-        luaL_openlibs(L)
+        luaL_openselectedlibs(L, ~0, 0)
     }
 
     override func tearDown() {
