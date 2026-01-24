@@ -19,6 +19,11 @@ Welcome to LuaKit 2.0! This major release brings significant new features for em
 - **LuaCoroutine**: Swift wrapper for Lua coroutines
 - **Table Serialization**: JSON and Codable support
 
+### Phase 4: API Cleanup
+- **Consistent Naming**: Improved method names for better discoverability
+- **Unified Error Handling**: Single `LuaError` type for all errors
+- **Documentation**: Enhanced documentation for advanced APIs
+
 ---
 
 ## Quick Start
@@ -416,6 +421,29 @@ Task {
 | `toJSON(prettyPrint:)` | Export to JSON string |
 | `toDictionary()` | Export to Swift dictionary |
 | `toArray()` | Export to Swift array (if array-like) |
+
+---
+
+## Migration from 1.x
+
+### Renamed APIs (Deprecated in 2.0)
+
+| Old API | New API |
+|---------|---------|
+| `registerFunction("name") { ... }` | `register(function: "name") { ... }` |
+| `registerEnum(MyEnum.self, as:)` | `register(enum: MyEnum.self, as:)` |
+| `executeReturning("code", as: T.self)` | `execute("code", returning: T.self)` |
+| `setPrintHandler { ... }` | `onPrint { ... }` |
+| `setOutputHandler { ... }` | `onPrint { ... }` |
+| `LuaEnumBridgeable` | `LuaBridgeableEnum` |
+
+The old APIs still work but will emit deprecation warnings. Update your code to use the new APIs for future compatibility.
+
+### Error Types
+
+`LuaError` is now the primary error type. The following are deprecated:
+- `LuaKitError` - Use `LuaError` instead
+- `LuaErrorContext` - Use `LuaError.typeMismatch(expected:actual:context:)` for type errors
 
 ---
 

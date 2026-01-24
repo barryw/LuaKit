@@ -8,20 +8,36 @@
 import Foundation
 import Lua
 
-/// Protocol for enums that can be bridged to Lua
-public protocol LuaEnumBridgeable: RawRepresentable, CaseIterable where RawValue == String {
+/// Protocol for enums that can be bridged to Lua.
+///
+/// Conform your string-backed enums to this protocol to enable automatic
+/// bridging between Swift and Lua.
+///
+/// Example:
+/// ```swift
+/// enum GameState: String, LuaBridgeableEnum {
+///     case menu, playing, paused, gameOver
+/// }
+///
+/// lua.register(enum: GameState.self, as: "GameState")
+/// ```
+public protocol LuaBridgeableEnum: RawRepresentable, CaseIterable where RawValue == String {
     static var luaTypeName: String { get }
 }
 
+/// Backward compatibility alias
+@available(*, deprecated, renamed: "LuaBridgeableEnum")
+public typealias LuaEnumBridgeable = LuaBridgeableEnum
+
 /// Default implementation
-extension LuaEnumBridgeable {
+extension LuaBridgeableEnum {
     public static var luaTypeName: String {
         return String(describing: Self.self)
     }
 }
 
-/// Extension to make LuaEnumBridgeable types LuaConvertible
-extension LuaEnumBridgeable {
+/// Extension to make LuaBridgeableEnum types LuaConvertible
+extension LuaBridgeableEnum {
     public static func push(_ value: Self, to L: OpaquePointer) {
         lua_pushstring(L, value.rawValue)
     }
@@ -34,8 +50,28 @@ extension LuaEnumBridgeable {
 
 /// LuaState extension for enum registration
 extension LuaState {
-    /// Register an enum type with Lua
-    public func registerEnum<T: LuaEnumBridgeable>(_ enumType: T.Type, as name: String? = nil) {
+    /// Register an enum type with Lua.
+    ///
+    /// Creates a Lua table with all enum cases as string values, along with
+    /// validation and conversion helper functions.
+    ///
+    /// - Parameters:
+    ///   - enumType: The enum type to register.
+    ///   - name: The name to use in Lua (defaults to the Swift type name).
+    ///
+    /// Example:
+    /// ```swift
+    /// enum Direction: String, LuaBridgeableEnum {
+    ///     case north, south, east, west
+    /// }
+    ///
+    /// lua.register(enum: Direction.self, as: "Direction")
+    ///
+    /// // In Lua:
+    /// // Direction.north == "north"
+    /// // validateDirection("north") == true
+    /// ```
+    public func register<T: LuaBridgeableEnum>(enum enumType: T.Type, as name: String? = nil) {
         let enumName = name ?? enumType.luaTypeName
         let L = self.luaState
 
@@ -62,26 +98,31 @@ extension LuaState {
 
         // Register validation function
         let validateFuncName = "validate\(enumName)"
-        registerFunction(validateFuncName) { (value: String) -> Bool in
+        register(function: validateFuncName) { (value: String) -> Bool in
             return T(rawValue: value) != nil
         }
 
         // Register conversion function
         let convertFuncName = "to\(enumName)"
-        registerFunction(convertFuncName) { (value: String) -> String? in
+        register(function: convertFuncName) { (value: String) -> String? in
             return T(rawValue: value)?.rawValue
         }
     }
 
+    @available(*, deprecated, renamed: "register(enum:as:)")
+    public func registerEnum<T: LuaBridgeableEnum>(_ enumType: T.Type, as name: String? = nil) {
+        register(enum: enumType, as: name)
+    }
+
     /// Register multiple enums at once
-    public func registerEnums(_ enums: [(type: any LuaEnumBridgeable.Type, name: String?)]) {
+    public func registerEnums(_ enums: [(type: any LuaBridgeableEnum.Type, name: String?)]) {
         for (enumType, name) in enums {
             // Use dynamic dispatch through a helper
             registerEnumDynamic(enumType, name: name)
         }
     }
 
-    private func registerEnumDynamic(_ enumType: any LuaEnumBridgeable.Type, name: String?) {
+    private func registerEnumDynamic(_ enumType: any LuaBridgeableEnum.Type, name: String?) {
         // This is a workaround for Swift's type system limitations
         // In practice, you'd need to handle each concrete enum type
         let enumName = name ?? enumType.luaTypeName
@@ -98,7 +139,7 @@ extension LuaState {
 }
 
 /// Helper for enum property validation
-public struct LuaEnumValidator<T: LuaEnumBridgeable>: Sendable {
+public struct LuaEnumValidator<T: LuaBridgeableEnum>: Sendable {
     public static func validate(_ value: String) -> Bool {
         return T(rawValue: value) != nil
     }

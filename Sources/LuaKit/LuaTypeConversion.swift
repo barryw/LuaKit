@@ -57,14 +57,7 @@ public final class LuaTypeConverterRegistry: @unchecked Sendable {
 public struct StringToUUIDConverter: LuaTypeConverter, Sendable {
     public static func convert(_ input: String) throws -> UUID {
         guard let uuid = UUID(uuidString: input) else {
-            throw LuaKitError.invalidArgument(
-                LuaErrorContext(
-                    functionName: "UUID conversion",
-                    expectedType: "valid UUID string",
-                    actualType: "string",
-                    additionalInfo: "Invalid UUID format: '\(input)'"
-                )
-            )
+            throw LuaError.invalidArgument("Invalid UUID format: '\(input)'")
         }
         return uuid
     }
@@ -82,14 +75,8 @@ public struct StringToDateConverter: LuaTypeConverter, Sendable {
 
     public static func convert(_ input: String) throws -> Date {
         guard let date = formatter.date(from: input) else {
-            throw LuaKitError.invalidArgument(
-                LuaErrorContext(
-                    functionName: "Date conversion",
-                    expectedType: "ISO8601 date string",
-                    actualType: "string",
-                    additionalInfo: "Invalid date format: '\(input)'",
-                    hint: "Use format: YYYY-MM-DDTHH:MM:SS.sssZ"
-                )
+            throw LuaError.invalidArgument(
+                "Invalid date format: '\(input)'. Use ISO8601 format: YYYY-MM-DDTHH:MM:SS.sssZ"
             )
         }
         return date
@@ -100,14 +87,7 @@ public struct StringToDateConverter: LuaTypeConverter, Sendable {
 public struct StringToURLConverter: LuaTypeConverter, Sendable {
     public static func convert(_ input: String) throws -> URL {
         guard let url = URL(string: input) else {
-            throw LuaKitError.invalidArgument(
-                LuaErrorContext(
-                    functionName: "URL conversion",
-                    expectedType: "valid URL string",
-                    actualType: "string",
-                    additionalInfo: "Invalid URL format: '\(input)'"
-                )
-            )
+            throw LuaError.invalidArgument("Invalid URL format: '\(input)'")
         }
         return url
     }
@@ -117,14 +97,7 @@ public struct StringToURLConverter: LuaTypeConverter, Sendable {
 public struct NumberToTimeIntervalConverter: LuaTypeConverter, Sendable {
     public static func convert(_ input: Double) throws -> TimeInterval {
         guard input >= 0 else {
-            throw LuaKitError.invalidArgument(
-                LuaErrorContext(
-                    functionName: "TimeInterval conversion",
-                    expectedType: "non-negative number",
-                    actualType: "number",
-                    additionalInfo: "TimeInterval cannot be negative: \(input)"
-                )
-            )
+            throw LuaError.invalidArgument("TimeInterval cannot be negative: \(input)")
         }
         return TimeInterval(input)
     }
@@ -257,36 +230,17 @@ public struct LuaConvert: Sendable {
     /// Convert a value using a registered converter
     public static func convert<T, U>(_ value: T, using converterName: String) throws -> U {
         guard let converterType = LuaTypeConverterRegistry.getConverter(named: converterName) else {
-            throw LuaKitError.invalidArgument(
-                LuaErrorContext(
-                    functionName: "convert",
-                    expectedType: "registered converter",
-                    actualType: "unknown",
-                    additionalInfo: "No converter registered with name '\(converterName)'"
-                )
-            )
+            throw LuaError.invalidArgument("No converter registered with name '\(converterName)'")
         }
 
         // This is a simplified version - in practice, we'd need more sophisticated type checking
         if converterType is any LuaTypeConverter.Type {
             // Dynamic dispatch would be needed here
-            throw LuaKitError.invalidArgument(
-                LuaErrorContext(
-                    functionName: "convert",
-                    expectedType: "converter implementation",
-                    actualType: "incomplete",
-                    additionalInfo: "Converter dispatch not yet implemented"
-                )
-            )
+            throw LuaError.invalidArgument("Converter dispatch not yet implemented")
         }
 
-        throw LuaKitError.invalidArgument(
-            LuaErrorContext(
-                functionName: "convert",
-                expectedType: "LuaTypeConverter",
-                actualType: String(describing: type(of: converterType)),
-                additionalInfo: "Invalid converter type"
-            )
+        throw LuaError.invalidArgument(
+            "Invalid converter type: \(String(describing: type(of: converterType)))"
         )
     }
 

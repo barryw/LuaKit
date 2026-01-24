@@ -8,7 +8,11 @@
 import Foundation
 import Lua
 
-/// Provides detailed error context for better debugging
+/// Provides detailed error context for better debugging.
+///
+/// - Note: This type is deprecated in favor of using `LuaError.typeMismatch(expected:actual:context:)`
+///   which provides similar functionality with a more integrated API.
+@available(*, deprecated, message: "Use LuaError.typeMismatch for type errors")
 public struct LuaErrorContext: Sendable {
     public let functionName: String
     public let argumentIndex: Int?
@@ -58,7 +62,11 @@ public struct LuaErrorContext: Sendable {
     }
 }
 
-/// Enhanced error types with context
+/// Enhanced error types with context.
+///
+/// - Note: This type is deprecated. Use `LuaError` instead, which provides
+///   comprehensive error handling for all Lua-related errors.
+@available(*, deprecated, message: "Use LuaError instead")
 public enum LuaKitError: Error, CustomStringConvertible {
     case invalidArgument(LuaErrorContext)
     case invalidReturnType(expected: String, got: String, function: String)
