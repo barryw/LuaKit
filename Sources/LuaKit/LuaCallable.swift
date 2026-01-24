@@ -97,6 +97,19 @@ public final class LuaCallable {
         }
     }
 
+    // MARK: - Public Accessors
+
+    /// The Lua state this callable belongs to, if still valid.
+    public var state: LuaState? {
+        return luaState
+    }
+
+    /// Pushes the referenced function onto the Lua stack.
+    public func pushFunction() {
+        guard let luaState = luaState else { return }
+        lua_rawgeti(luaState.luaState, luaRegistryIndex, lua_Integer(reference))
+    }
+
     // MARK: - Call with Return Value
 
     /// Calls the Lua function with no arguments and returns the result.

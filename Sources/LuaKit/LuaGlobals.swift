@@ -260,6 +260,20 @@ public class LuaTable {
         lua_rawgeti(luaState.luaState, luaRegistryIndex, lua_Integer(reference))
     }
 
+    /// Internal accessor for the Lua state (used by extensions in other files)
+    var state: LuaState? {
+        return luaState
+    }
+
+    /// Internal accessor to push and get the Lua pointer
+    func withLuaState<R>(_ body: (OpaquePointer) throws -> R) rethrows -> R? {
+        guard let luaState = luaState else { return nil }
+        let L = luaState.luaState
+        push()
+        defer { lua_pop(L, 1) }
+        return try body(L)
+    }
+
     /// Array-style access (1-indexed like Lua)
     public subscript(index: Int) -> Any? {
         get {
