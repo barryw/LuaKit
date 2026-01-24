@@ -8,49 +8,89 @@
 import Foundation
 import Lua
 
-/// Async operation handle for Lua
-public class LuaAsyncHandle {
+/// Async operation handle for Lua.
+///
+/// Thread-safe via internal locking for Swift 6 concurrency compliance.
+public final class LuaAsyncHandle: @unchecked Sendable {
     private let id: UUID
-    private var callback: ((Any?, Error?) -> Void)?
+    private var callback: (@Sendable (Any?, Error?) -> Void)?
     private var isCompleted = false
+    private let lock = NSLock()
 
     public init() {
         self.id = UUID()
     }
 
     public func complete(result: Any?, error: Error?) {
+        lock.lock()
+        defer { lock.unlock() }
         guard !isCompleted else { return }
         isCompleted = true
-        callback?(result, error)
+        let cb = callback
         callback = nil
+        // Call callback outside lock to avoid deadlocks
+        lock.unlock()
+        cb?(result, error)
+        lock.lock()
     }
 
-    public func onComplete(_ callback: @escaping (Any?, Error?) -> Void) {
-        if isCompleted {
+    public func onComplete(_ callback: @escaping @Sendable (Any?, Error?) -> Void) {
+        lock.lock()
+        let completed = isCompleted
+        if !completed {
+            self.callback = callback
+        }
+        lock.unlock()
+
+        if completed {
             // Already completed, call immediately
             callback(nil, nil)
-        } else {
-            self.callback = callback
         }
     }
 }
 
-/// Registry for active async operations
-public class LuaAsyncRegistry {
-    private static var activeHandles: [UUID: LuaAsyncHandle] = [:]
+/// Registry for active async operations.
+///
+/// Thread-safe for Swift 6 concurrency compliance.
+public final class LuaAsyncRegistry: @unchecked Sendable {
+    /// Thread-safe storage for async handles
+    private final class Storage: @unchecked Sendable {
+        private var activeHandles: [UUID: LuaAsyncHandle] = [:]
+        private let lock = NSLock()
+
+        static let shared = Storage()
+
+        func register(_ handle: LuaAsyncHandle) -> UUID {
+            lock.lock()
+            defer { lock.unlock() }
+            let id = UUID()
+            activeHandles[id] = handle
+            return id
+        }
+
+        func get(_ id: UUID) -> LuaAsyncHandle? {
+            lock.lock()
+            defer { lock.unlock() }
+            return activeHandles[id]
+        }
+
+        func remove(_ id: UUID) {
+            lock.lock()
+            defer { lock.unlock() }
+            activeHandles.removeValue(forKey: id)
+        }
+    }
 
     public static func register(_ handle: LuaAsyncHandle) -> UUID {
-        let id = UUID()
-        activeHandles[id] = handle
-        return id
+        return Storage.shared.register(handle)
     }
 
     public static func get(_ id: UUID) -> LuaAsyncHandle? {
-        return activeHandles[id]
+        return Storage.shared.get(id)
     }
 
     public static func remove(_ id: UUID) {
-        activeHandles.removeValue(forKey: id)
+        Storage.shared.remove(id)
     }
 }
 
@@ -79,11 +119,11 @@ extension LuaState {
 }
 
 /// Wrapper for async methods to work with Lua
-public struct LuaAsyncWrapper {
+public struct LuaAsyncWrapper: Sendable {
     /// Wrap an async function for Lua consumption
-    public static func wrap<T>(
-        _ asyncFunction: @escaping () async throws -> T
-    ) -> () -> Void {
+    public static func wrap<T: Sendable>(
+        _ asyncFunction: @escaping @Sendable () async throws -> T
+    ) -> @Sendable () -> Void {
         return {
             Task {
                 do {

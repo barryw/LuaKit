@@ -57,6 +57,7 @@ public final class LuaState {
     }
 
     deinit {
+        LuaState.stateStorage.unregister(L)
         lua_close(L)
     }
 
@@ -66,7 +67,7 @@ public final class LuaState {
     private var printBufferPolicy: PrintBufferPolicy = .unlimited
 
     /// Policy for managing print buffer size and behavior
-    public enum PrintBufferPolicy {
+    public enum PrintBufferPolicy: Sendable {
         case unlimited
         case truncateOldest
         case truncateNewest
@@ -103,7 +104,7 @@ public final class LuaState {
     private func setupPrintCapture() {
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
-            let state = LuaState.states[L]
+            let state = LuaState.stateStorage[L]
 
             let n = lua_gettop(L)
             var output = ""
@@ -150,10 +151,39 @@ public final class LuaState {
         }, 0)
         lua_setglobal(L, "print")
 
-        LuaState.states[L] = self
+        LuaState.stateStorage.register(self, for: L)
     }
 
-    private static var states: [OpaquePointer: LuaState] = [:]
+    /// Thread-safe storage for LuaState lookup by raw pointer.
+    /// This is needed for C callbacks (like print) to find the Swift LuaState.
+    private final class StateStorage: @unchecked Sendable {
+        private var states: [OpaquePointer: LuaState] = [:]
+        private let lock = NSLock()
+
+        static let shared = StateStorage()
+
+        subscript(_ L: OpaquePointer) -> LuaState? {
+            get {
+                lock.lock()
+                defer { lock.unlock() }
+                return states[L]
+            }
+        }
+
+        func register(_ state: LuaState, for L: OpaquePointer) {
+            lock.lock()
+            defer { lock.unlock() }
+            states[L] = state
+        }
+
+        func unregister(_ L: OpaquePointer) {
+            lock.lock()
+            defer { lock.unlock() }
+            states.removeValue(forKey: L)
+        }
+    }
+
+    private static var stateStorage: StateStorage { StateStorage.shared }
 
     private func registerArrayProxyTypes() {
         // Register array proxy types for each supported element type

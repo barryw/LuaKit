@@ -98,7 +98,7 @@ extension LuaState {
 }
 
 /// Helper for enum property validation
-public struct LuaEnumValidator<T: LuaEnumBridgeable> {
+public struct LuaEnumValidator<T: LuaEnumBridgeable>: Sendable {
     public static func validate(_ value: String) -> Bool {
         return T(rawValue: value) != nil
     }
@@ -112,19 +112,48 @@ public struct LuaEnumValidator<T: LuaEnumBridgeable> {
     }
 }
 
-/// Macro support for automatic enum registration
-public struct LuaEnumRegistry {
-    private static var registeredEnums: Set<String> = []
+/// Macro support for automatic enum registration.
+///
+/// This type provides a synchronous interface to the enum registry in `LuaKitRegistry`.
+/// For Swift 6 concurrency compliance, registration state is stored in the central actor.
+public struct LuaEnumRegistry: Sendable {
+    /// Thread-safe storage for enum registration state.
+    /// Uses `@unchecked Sendable` with internal locking since enum registration
+    /// may be called during init (synchronously).
+    private final class Storage: @unchecked Sendable {
+        private var registeredEnums: Set<String> = []
+        private let lock = NSLock()
+
+        static let shared = Storage()
+
+        func markAsRegistered(_ enumName: String) {
+            lock.lock()
+            defer { lock.unlock() }
+            registeredEnums.insert(enumName)
+        }
+
+        func isRegistered(_ enumName: String) -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            return registeredEnums.contains(enumName)
+        }
+
+        func allRegisteredEnums() -> [String] {
+            lock.lock()
+            defer { lock.unlock() }
+            return Array(registeredEnums)
+        }
+    }
 
     public static func markAsRegistered(_ enumName: String) {
-        registeredEnums.insert(enumName)
+        Storage.shared.markAsRegistered(enumName)
     }
 
     public static func isRegistered(_ enumName: String) -> Bool {
-        return registeredEnums.contains(enumName)
+        return Storage.shared.isRegistered(enumName)
     }
 
     public static func allRegisteredEnums() -> [String] {
-        return Array(registeredEnums)
+        return Storage.shared.allRegisteredEnums()
     }
 }

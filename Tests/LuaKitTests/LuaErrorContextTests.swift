@@ -130,7 +130,7 @@ final class LuaErrorContextTests: XCTestCase {
     func testValidationFailedError() {
         let error = LuaKitError.validationFailed(
             property: "age",
-            value: -5,
+            value: "-5",
             reason: "Age must be positive"
         )
 

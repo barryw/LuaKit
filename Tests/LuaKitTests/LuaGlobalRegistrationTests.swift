@@ -242,7 +242,25 @@ final class LuaGlobalRegistrationTests: XCTestCase {
     // MARK: - Debug Logging Tests
 
     func testDebugLogging() {
-        var capturedLogs: [String] = []
+        // Use a thread-safe log capture mechanism
+        final class LogCapture: @unchecked Sendable {
+            private let lock = NSLock()
+            private var logs: [String] = []
+
+            func append(_ message: String) {
+                lock.lock()
+                defer { lock.unlock() }
+                logs.append(message)
+            }
+
+            func contains(_ predicate: (String) -> Bool) -> Bool {
+                lock.lock()
+                defer { lock.unlock() }
+                return logs.contains(where: predicate)
+            }
+        }
+
+        let capturedLogs = LogCapture()
         LuaDebugConfig.logger = { message, _ in
             capturedLogs.append(message)
         }
@@ -252,7 +270,7 @@ final class LuaGlobalRegistrationTests: XCTestCase {
 
         XCTAssertTrue(capturedLogs.contains { $0.contains("Registered global 'debugTest'") })
 
-        lua.registerNamespace("DebugNamespace")
+        _ = lua.registerNamespace("DebugNamespace")
 
         XCTAssertTrue(capturedLogs.contains { $0.contains("Created namespace 'DebugNamespace'") })
 

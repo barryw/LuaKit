@@ -5,25 +5,41 @@
 //  Advanced tests for LuaFunction edge cases and untested paths
 //
 
+import Foundation
 import Lua
 @testable import LuaKit
 import XCTest
 
+/// Thread-safe array wrapper for tests
+private final class FunctionArray: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _functions: [LuaFunction] = []
+
+    var functions: [LuaFunction] {
+        lock.lock()
+        defer { lock.unlock() }
+        return _functions
+    }
+
+    func append(_ function: LuaFunction) {
+        lock.lock()
+        defer { lock.unlock() }
+        _functions.append(function)
+    }
+}
+
+@MainActor
 final class LuaFunctionAdvancedTests: XCTestCase {
     var lua: LuaState!
 
-    override func setUp() {
-        super.setUp()
-        do {
-            lua = try LuaState()
-        } catch {
-            XCTFail("Failed to create LuaState: \(error)")
-        }
+    override func setUp() async throws {
+        try await super.setUp()
+        lua = try LuaState()
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         lua = nil
-        super.tearDown()
+        try await super.tearDown()
     }
 
     // MARK: - Debug Mode Tests
@@ -142,9 +158,9 @@ final class LuaFunctionAdvancedTests: XCTestCase {
         lua_pop(lua.luaState, 2)
     }
 
-    func testFunctionReturningMixedArray() {
+    func testFunctionReturningMixedArray() throws {
         // Skip this test as [Any] arrays can cause infinite recursion in pushResult
-        XCTSkip("[Any] arrays can cause infinite recursion in pushResult function")
+        throw XCTSkip("[Any] arrays can cause infinite recursion in pushResult function")
     }
 
     func testFunctionReturningBridgeable() {
@@ -165,9 +181,9 @@ final class LuaFunctionAdvancedTests: XCTestCase {
         lua_pop(lua.luaState, 2)
     }
 
-    func testFunctionReturningUnsupportedType() {
+    func testFunctionReturningUnsupportedType() throws {
         // Skip this test as it can cause segmentation faults
-        XCTSkip("Unsupported type handling can cause segmentation faults")
+        throw XCTSkip("Unsupported type handling can cause segmentation faults")
     }
 
     // MARK: - Optional Handling Tests
@@ -218,10 +234,10 @@ final class LuaFunctionAdvancedTests: XCTestCase {
 
     // MARK: - Closure Table Lifecycle Tests
 
-    func testFunctionTableGarbageCollection() {
+    func testFunctionTableGarbageCollection() throws {
         // Skip this test as it causes segmentation fault
         // When Swift function is deallocated, calling from Lua crashes
-        XCTSkip("Function GC test causes segmentation fault when Swift reference is released")
+        throw XCTSkip("Function GC test causes segmentation fault when Swift reference is released")
     }
 
     func testFunctionInvalidCall() {
@@ -274,9 +290,8 @@ final class LuaFunctionAdvancedTests: XCTestCase {
         let expectation = self.expectation(description: "Thread safety")
         expectation.expectedFulfillmentCount = 100
 
-        var functions: [LuaFunction] = []
+        let functionArray = FunctionArray()
         let queue = DispatchQueue(label: "test", attributes: .concurrent)
-        let lock = NSLock()
 
         for i in 0..<100 {
             queue.async {
@@ -284,9 +299,7 @@ final class LuaFunctionAdvancedTests: XCTestCase {
                     return i
                 }
 
-                lock.lock()
-                functions.append(function)
-                lock.unlock()
+                functionArray.append(function)
 
                 expectation.fulfill()
             }
@@ -295,7 +308,7 @@ final class LuaFunctionAdvancedTests: XCTestCase {
         waitForExpectations(timeout: 5.0)
 
         // Now push them to Lua from main thread
-        for (i, function) in functions.enumerated() {
+        for (i, function) in functionArray.functions.enumerated() {
             function.push(to: lua.luaState)
             lua_setglobal(lua.luaState, "threadFunc\(i)")
         }
@@ -303,14 +316,14 @@ final class LuaFunctionAdvancedTests: XCTestCase {
 
     // MARK: - Edge Cases
 
-    func testVeryLargeClosureId() {
+    func testVeryLargeClosureId() throws {
         // Skip this test as it can cause memory issues
-        XCTSkip("Very large closure ID test can cause memory pressure and segmentation faults")
+        throw XCTSkip("Very large closure ID test can cause memory pressure and segmentation faults")
     }
 
-    func testFunctionDeallocationOrder() {
+    func testFunctionDeallocationOrder() throws {
         // Skip this test as it can cause segmentation faults
-        XCTSkip("Function deallocation order test can cause segmentation faults")
+        throw XCTSkip("Function deallocation order test can cause segmentation faults")
     }
 
     // MARK: - Performance Tests

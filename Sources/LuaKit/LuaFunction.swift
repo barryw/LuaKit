@@ -9,26 +9,19 @@ import Foundation
 import Lua
 
 /// A type-erased wrapper for Swift closures that can be called from Lua
-public class LuaFunction {
+public final class LuaFunction: @unchecked Sendable {
     /// Enable debug logging for type conversion issues
-    public static var debugMode: Bool = false
-    // Global registry of closures by ID
-    private static var closures: [Int: (OpaquePointer) -> Int32] = [:]
-    private static var retainedFunctions: [Int: LuaFunction] = [:]
-    private static var nextId: Int = 1
-    private static let lock = NSLock()
+    public static nonisolated(unsafe) var debugMode: Bool = false
 
+    /// The unique ID for this function in the closure storage
     private let id: Int
+
+    /// Convenience accessor for the shared closure storage
+    private static var storage: LuaClosureStorage { LuaClosureStorage.shared }
 
     /// Creates a Lua function from a Swift closure with no parameters
     public init<R>(_ closure: @escaping () -> R) {
-        LuaFunction.lock.lock()
-        defer { LuaFunction.lock.unlock() }
-
-        self.id = LuaFunction.nextId
-        LuaFunction.nextId += 1
-
-        LuaFunction.closures[self.id] = { L in
+        self.id = Self.storage.registerClosure { L in
             let result = closure()
             return LuaFunction.pushResult(result, to: L)
         }
@@ -36,13 +29,7 @@ public class LuaFunction {
 
     /// Creates a Lua function from a Swift closure with one parameter
     public init<T1, R>(_ closure: @escaping (T1) -> R) where T1: LuaConvertible {
-        LuaFunction.lock.lock()
-        defer { LuaFunction.lock.unlock() }
-
-        self.id = LuaFunction.nextId
-        LuaFunction.nextId += 1
-
-        LuaFunction.closures[self.id] = { L in
+        self.id = Self.storage.registerClosure { L in
             guard let arg1 = T1.pull(from: L, at: 1) else {
                 return luaError(L, "Expected \(T1.self) for argument 1")
             }
@@ -54,13 +41,7 @@ public class LuaFunction {
     /// Creates a Lua function from a Swift closure with two parameters
     public init<T1, T2, R>(_ closure: @escaping (T1, T2) -> R)
     where T1: LuaConvertible, T2: LuaConvertible {
-        LuaFunction.lock.lock()
-        defer { LuaFunction.lock.unlock() }
-
-        self.id = LuaFunction.nextId
-        LuaFunction.nextId += 1
-
-        LuaFunction.closures[self.id] = { L in
+        self.id = Self.storage.registerClosure { L in
             guard let arg1 = T1.pull(from: L, at: 1) else {
                 return luaError(L, "Expected \(T1.self) for argument 1")
             }
@@ -75,13 +56,7 @@ public class LuaFunction {
     /// Creates a Lua function from a Swift closure with three parameters
     public init<T1, T2, T3, R>(_ closure: @escaping (T1, T2, T3) -> R)
     where T1: LuaConvertible, T2: LuaConvertible, T3: LuaConvertible {
-        LuaFunction.lock.lock()
-        defer { LuaFunction.lock.unlock() }
-
-        self.id = LuaFunction.nextId
-        LuaFunction.nextId += 1
-
-        LuaFunction.closures[self.id] = { L in
+        self.id = Self.storage.registerClosure { L in
             guard let arg1 = T1.pull(from: L, at: 1) else {
                 return luaError(L, "Expected \(T1.self) for argument 1")
             }
@@ -97,18 +72,13 @@ public class LuaFunction {
     }
 
     deinit {
-        LuaFunction.lock.lock()
-        defer { LuaFunction.lock.unlock() }
-        LuaFunction.closures.removeValue(forKey: self.id)
-        LuaFunction.retainedFunctions.removeValue(forKey: self.id)
+        Self.storage.removeAll(id: self.id)
     }
 
     /// Pushes the function onto the Lua stack
     func push(to L: OpaquePointer) {
-        // Keep a strong reference to self
-        LuaFunction.lock.lock()
-        LuaFunction.retainedFunctions[self.id] = self
-        LuaFunction.lock.unlock()
+        // Keep a strong reference to self to prevent deallocation while Lua holds a reference
+        Self.storage.retainFunction(self, id: self.id)
 
         // Create a Lua table to hold the function ID
         lua_createtable(L, 0, 1)
@@ -138,12 +108,8 @@ public class LuaFunction {
             // Remove the function table from arguments
             lua_remove(L, 1)
 
-            // Look up and call the closure
-            LuaFunction.lock.lock()
-            let closure = LuaFunction.closures[id]
-            LuaFunction.lock.unlock()
-
-            guard let closure = closure else {
+            // Look up and call the closure from storage
+            guard let closure = LuaClosureStorage.shared.getClosure(id: id) else {
                 return luaError(L, "Function no longer exists")
             }
 
@@ -161,9 +127,7 @@ public class LuaFunction {
             let id = Int(lua_tointegerx(L, -1, nil))
 
             // Release the retained reference
-            LuaFunction.lock.lock()
-            LuaFunction.retainedFunctions.removeValue(forKey: id)
-            LuaFunction.lock.unlock()
+            LuaClosureStorage.shared.releaseFunction(id: id)
 
             return 0
         }, 0)

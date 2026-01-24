@@ -9,7 +9,7 @@ import Foundation
 import Lua
 
 /// Provides detailed error context for better debugging
-public struct LuaErrorContext {
+public struct LuaErrorContext: Sendable {
     public let functionName: String
     public let argumentIndex: Int?
     public let expectedType: String
@@ -63,7 +63,7 @@ public enum LuaKitError: Error, CustomStringConvertible {
     case invalidArgument(LuaErrorContext)
     case invalidReturnType(expected: String, got: String, function: String)
     case missingRequiredParameter(parameter: String, function: String)
-    case validationFailed(property: String, value: Any, reason: String)
+    case validationFailed(property: String, value: String, reason: String)
     case enumConversionFailed(type: String, value: String, validValues: [String])
     case asyncOperationFailed(function: String, reason: String)
 

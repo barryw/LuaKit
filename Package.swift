@@ -1,4 +1,4 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 6.0
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -38,18 +38,45 @@ let package = Package(
             dependencies: [
                 .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
                 .product(name: "SwiftCompilerPlugin", package: "swift-syntax")
-            ]),
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
         .target(
             name: "LuaKit",
             dependencies: [
                 "Lua",
                 "LuaMacros"
-            ]),
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
         .testTarget(
             name: "LuaKitTests",
-            dependencies: ["LuaKit"]),
+            dependencies: ["LuaKit"],
+            exclude: [
+                "EnhancementsTests.swift.disabled",
+                "LuaIgnoreTest.swift.disabled",
+                "PropertyChangeTests.swift.disabled",
+                "ArrayPropertyTests.swift.disabled",
+                "ArrayElementAccessTests.swift.disabled"
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
         .testTarget(
             name: "LuaKitPublicAPITests",
-            dependencies: ["LuaKit"]),
+            dependencies: ["LuaKit"],
+            exclude: [
+                "README.md",
+                "ArrayProxyPublicAPITest.swift.disabled"
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
     ]
 )
