@@ -94,8 +94,48 @@ public struct LuaGlobals {
             reference.push()
         case let table as LuaTable:
             table.push()
+        // Array support - check specific types first for efficiency
+        case let stringArray as [String]:
+            pushArray(stringArray, to: L)
+        case let intArray as [Int]:
+            pushArray(intArray, to: L)
+        case let doubleArray as [Double]:
+            pushArray(doubleArray, to: L)
+        case let boolArray as [Bool]:
+            pushArray(boolArray, to: L)
+        // Nested arrays and generic arrays via [Any]
+        case let anyArray as [Any]:
+            pushAnyArray(anyArray, to: L)
+        // Dictionary support
+        case let stringDict as [String: Any]:
+            pushDictionary(stringDict, to: L)
         default:
             lua_pushnil(L)
+        }
+    }
+
+    private func pushArray<T>(_ array: [T], to L: OpaquePointer) {
+        lua_createtable(L, Int32(array.count), 0)
+        for (index, element) in array.enumerated() {
+            pushValue(element, to: L)
+            lua_rawseti(L, -2, lua_Integer(index + 1))
+        }
+    }
+
+    private func pushAnyArray(_ array: [Any], to L: OpaquePointer) {
+        lua_createtable(L, Int32(array.count), 0)
+        for (index, element) in array.enumerated() {
+            pushValue(element, to: L)
+            lua_rawseti(L, -2, lua_Integer(index + 1))
+        }
+    }
+
+    private func pushDictionary(_ dict: [String: Any], to L: OpaquePointer) {
+        lua_createtable(L, 0, Int32(dict.count))
+        for (key, value) in dict {
+            lua_pushstring(L, key)
+            pushValue(value, to: L)
+            lua_settable(L, -3)
         }
     }
 
@@ -106,9 +146,9 @@ public struct LuaGlobals {
     }
 
     private func extractValue(from L: OpaquePointer, at index: Int32) -> Any? {
-        let type = lua_type(L, index)
+        let luaType = lua_type(L, index)
 
-        switch type {
+        switch luaType {
         case LUA_TBOOLEAN:
             return lua_toboolean(L, index) != 0
         case LUA_TNUMBER:
@@ -122,8 +162,7 @@ public struct LuaGlobals {
                 return String(cString: cStr)
             }
         case LUA_TTABLE:
-            // Return as opaque handle for now
-            return "<table>"
+            return extractTable(from: L, at: index)
         case LUA_TUSERDATA:
             // Could potentially extract the Swift object here
             return "<userdata>"
@@ -132,6 +171,36 @@ public struct LuaGlobals {
         }
 
         return nil
+    }
+
+    private func extractTable(from L: OpaquePointer, at index: Int32) -> Any {
+        let tableIndex = lua_absindex(L, index)
+        let len = lua_rawlen(L, tableIndex)
+
+        // Check if it's an array-like table (sequential integer keys starting at 1)
+        if len > 0 {
+            var array: [Any] = []
+            for i in 1...len {
+                lua_rawgeti(L, tableIndex, lua_Integer(i))
+                if let value = extractValue(from: L, at: -1) {
+                    array.append(value)
+                }
+                lua_pop(L, 1)
+            }
+            return array
+        }
+
+        // Otherwise, treat as dictionary
+        var dict: [String: Any] = [:]
+        lua_pushnil(L)
+        while lua_next(L, tableIndex) != 0 {
+            if let key = lua_tolstring(L, -2, nil),
+               let value = extractValue(from: L, at: -1) {
+                dict[String(cString: key)] = value
+            }
+            lua_pop(L, 1)
+        }
+        return dict
     }
 }
 
@@ -269,8 +338,47 @@ public class LuaTable {
             reference.push()
         case let table as LuaTable:
             table.push()
+        // Array support
+        case let stringArray as [String]:
+            pushArray(stringArray, to: L)
+        case let intArray as [Int]:
+            pushArray(intArray, to: L)
+        case let doubleArray as [Double]:
+            pushArray(doubleArray, to: L)
+        case let boolArray as [Bool]:
+            pushArray(boolArray, to: L)
+        case let anyArray as [Any]:
+            pushAnyArray(anyArray, to: L)
+        // Dictionary support
+        case let stringDict as [String: Any]:
+            pushDictionary(stringDict, to: L)
         default:
             lua_pushnil(L)
+        }
+    }
+
+    private func pushArray<T>(_ array: [T], to L: OpaquePointer) {
+        lua_createtable(L, Int32(array.count), 0)
+        for (index, element) in array.enumerated() {
+            pushValue(element, to: L)
+            lua_rawseti(L, -2, lua_Integer(index + 1))
+        }
+    }
+
+    private func pushAnyArray(_ array: [Any], to L: OpaquePointer) {
+        lua_createtable(L, Int32(array.count), 0)
+        for (index, element) in array.enumerated() {
+            pushValue(element, to: L)
+            lua_rawseti(L, -2, lua_Integer(index + 1))
+        }
+    }
+
+    private func pushDictionary(_ dict: [String: Any], to L: OpaquePointer) {
+        lua_createtable(L, 0, Int32(dict.count))
+        for (key, value) in dict {
+            lua_pushstring(L, key)
+            pushValue(value, to: L)
+            lua_settable(L, -3)
         }
     }
 
@@ -281,9 +389,9 @@ public class LuaTable {
     }
 
     private func extractValue(from L: OpaquePointer, at index: Int32) -> Any? {
-        let type = lua_type(L, index)
+        let luaType = lua_type(L, index)
 
-        switch type {
+        switch luaType {
         case LUA_TBOOLEAN:
             return lua_toboolean(L, index) != 0
         case LUA_TNUMBER:
@@ -296,10 +404,206 @@ public class LuaTable {
             if let cStr = lua_tolstring(L, index, nil) {
                 return String(cString: cStr)
             }
+        case LUA_TTABLE:
+            return extractTable(from: L, at: index)
         default:
             break
         }
 
         return nil
+    }
+
+    private func extractTable(from L: OpaquePointer, at index: Int32) -> Any {
+        let tableIndex = lua_absindex(L, index)
+        let len = lua_rawlen(L, tableIndex)
+
+        // Check if it's an array-like table (sequential integer keys starting at 1)
+        if len > 0 {
+            var array: [Any] = []
+            for i in 1...len {
+                lua_rawgeti(L, tableIndex, lua_Integer(i))
+                if let value = extractValue(from: L, at: -1) {
+                    array.append(value)
+                }
+                lua_pop(L, 1)
+            }
+            return array
+        }
+
+        // Otherwise, treat as dictionary
+        var dict: [String: Any] = [:]
+        lua_pushnil(L)
+        while lua_next(L, tableIndex) != 0 {
+            if let key = lua_tolstring(L, -2, nil),
+               let value = extractValue(from: L, at: -1) {
+                dict[String(cString: key)] = value
+            }
+            lua_pop(L, 1)
+        }
+        return dict
+    }
+}
+
+// MARK: - LuaTable Sequence Conformance
+
+extension LuaTable: Sequence {
+    /// An iterator for LuaTable that yields (key, value) pairs
+    public struct Iterator: IteratorProtocol {
+        private weak var luaState: LuaState?
+        private let reference: Int32
+        private var hasStarted: Bool = false
+        private var isExhausted: Bool = false
+
+        init(table: LuaTable) {
+            self.luaState = table.luaState
+            self.reference = table.reference
+        }
+
+        public mutating func next() -> (key: LuaValue, value: LuaValue)? {
+            guard let luaState = luaState, !isExhausted else { return nil }
+            let L = luaState.luaState
+
+            // Push table
+            lua_rawgeti(L, luaRegistryIndex, lua_Integer(reference))
+            let tableIndex = lua_gettop(L)
+
+            if !hasStarted {
+                // First iteration: push nil as initial key
+                lua_pushnil(L)
+                hasStarted = true
+            } else {
+                // Subsequent iterations: push nil (key was consumed)
+                lua_pushnil(L)
+            }
+
+            if lua_next(L, tableIndex) != 0 {
+                // Stack now has: table, key, value
+                let value = LuaValue.pull(from: L, at: -1) ?? .nil
+                let key = LuaValue.pull(from: L, at: -2) ?? .nil
+
+                // Pop value and key, leave table for cleanup
+                lua_pop(L, 2)
+                lua_pop(L, 1) // Pop table
+
+                return (key: key, value: value)
+            } else {
+                // Iteration complete
+                isExhausted = true
+                lua_pop(L, 1) // Pop table
+                return nil
+            }
+        }
+    }
+
+    public func makeIterator() -> Iterator {
+        return Iterator(table: self)
+    }
+
+    /// The number of elements in the table (using rawlen for array-like tables)
+    public var count: Int {
+        guard let luaState = luaState else { return 0 }
+        let L = luaState.luaState
+
+        push()
+        let len = Int(lua_rawlen(L, -1))
+        lua_pop(L, 1)
+
+        // If rawlen returns 0, count manually using iteration
+        if len == 0 {
+            var count = 0
+            push()
+            lua_pushnil(L)
+            while lua_next(L, -2) != 0 {
+                count += 1
+                lua_pop(L, 1) // Pop value, keep key
+            }
+            lua_pop(L, 1) // Pop table
+            return count
+        }
+
+        return len
+    }
+
+    /// All keys in the table
+    public var keys: [LuaValue] {
+        guard let luaState = luaState else { return [] }
+        let L = luaState.luaState
+        var result: [LuaValue] = []
+
+        push()
+        let tableIndex = lua_gettop(L)
+        lua_pushnil(L)
+
+        while lua_next(L, tableIndex) != 0 {
+            if let key = LuaValue.pull(from: L, at: -2) {
+                result.append(key)
+            }
+            lua_pop(L, 1) // Pop value, keep key
+        }
+
+        lua_pop(L, 1) // Pop table
+        return result
+    }
+
+    /// All values in the table
+    public var values: [LuaValue] {
+        guard let luaState = luaState else { return [] }
+        let L = luaState.luaState
+        var result: [LuaValue] = []
+
+        push()
+        let tableIndex = lua_gettop(L)
+        lua_pushnil(L)
+
+        while lua_next(L, tableIndex) != 0 {
+            if let value = LuaValue.pull(from: L, at: -1) {
+                result.append(value)
+            }
+            lua_pop(L, 1) // Pop value, keep key
+        }
+
+        lua_pop(L, 1) // Pop table
+        return result
+    }
+
+    /// Check if the table is empty
+    public var isEmpty: Bool {
+        guard let luaState = luaState else { return true }
+        let L = luaState.luaState
+
+        push()
+        lua_pushnil(L)
+        let hasNext = lua_next(L, -2) != 0
+        if hasNext {
+            lua_pop(L, 2) // Pop key and value
+        }
+        lua_pop(L, 1) // Pop table
+
+        return !hasNext
+    }
+
+    /// Check if the table contains a specific key
+    public func contains(key: String) -> Bool {
+        return self[key] != nil
+    }
+
+    /// Check if the table contains a specific index
+    public func contains(index: Int) -> Bool {
+        return self[index] != nil
+    }
+}
+
+// MARK: - LuaState Table Access Extension
+
+public extension LuaState {
+    /// Gets a LuaTable reference to a global table
+    func getTable(_ name: String) -> LuaTable? {
+        lua_getglobal(luaState, name)
+        guard lua_type(luaState, -1) == LUA_TTABLE else {
+            lua_pop(luaState, 1)
+            return nil
+        }
+        let ref = luaL_ref(luaState, luaRegistryIndex)
+        return LuaTable(reference: ref, luaState: self)
     }
 }

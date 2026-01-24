@@ -118,6 +118,7 @@ final class LuaErrorTests: XCTestCase {
             "runtime": 0,
             "typeMismatch": 0,
             "invalidArgument": 0,
+            "functionNotFound": 0,
             "custom": 0
         ]
 
@@ -133,6 +134,8 @@ final class LuaErrorTests: XCTestCase {
                 counts["typeMismatch"]! += 1
             case .invalidArgument:
                 counts["invalidArgument"]! += 1
+            case .functionNotFound:
+                counts["functionNotFound"]! += 1
             case .custom:
                 counts["custom"]! += 1
             }

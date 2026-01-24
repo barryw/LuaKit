@@ -13,6 +13,7 @@ public enum LuaError: LocalizedError {
     case runtime(String)
     case typeMismatch(expected: String, got: String)
     case invalidArgument(String)
+    case functionNotFound(String)
     case custom(String)
 
     public var errorDescription: String? {
@@ -27,6 +28,8 @@ public enum LuaError: LocalizedError {
             return "Type mismatch: expected \(expected), got \(got)"
         case .invalidArgument(let message):
             return "Invalid argument: \(message)"
+        case .functionNotFound(let message):
+            return "Function not found: \(message)"
         case .custom(let message):
             return message
         }

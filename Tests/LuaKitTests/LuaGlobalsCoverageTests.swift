@@ -103,8 +103,15 @@ final class LuaGlobalsCoverageTests: XCTestCase {
         // Verify all stored correctly
         XCTAssertEqual(table["string"] as? String, "Hello")
         XCTAssertEqual(table["int"] as? Int, 42)
-        XCTAssertNil(table["func"]) // Functions return nil when retrieved
-        XCTAssertNil(table["nested"]) // Tables return nil when retrieved
+
+        // Functions now return metadata
+        let funcResult = table["func"]
+        XCTAssertNotNil(funcResult)
+
+        // Nested tables now return their contents
+        let nestedResult = table["nested"] as? [String: Any]
+        XCTAssertNotNil(nestedResult)
+        XCTAssertEqual(nestedResult?["inner"] as? String, "value")
         // XCTAssertNotNil(table["ref"]) - skipped
     }
 
@@ -151,7 +158,14 @@ final class LuaGlobalsCoverageTests: XCTestCase {
         XCTAssertEqual(lua.globals["globalBool"] as? Bool, true)
         XCTAssertEqual(lua.globals["globalNumber"] as? Double, 42.5)
         XCTAssertEqual(lua.globals["globalString"] as? String, "test")
-        XCTAssertEqual(lua.globals["globalTable"] as? String, "<table>")
+        // Tables are now properly extracted as dictionaries or arrays
+        XCTAssertNotNil(lua.globals["globalTable"])
+        if let table = lua.globals["globalTable"] as? [String: Any] {
+            XCTAssertEqual(table["a"] as? Int, 1)
+            XCTAssertEqual(table["b"] as? Int, 2)
+        } else {
+            XCTFail("globalTable should be a dictionary")
+        }
         XCTAssertNil(lua.globals["globalFunction"]) // Functions return nil
         XCTAssertNil(lua.globals["globalThread"]) // Threads return nil
         XCTAssertNil(lua.globals["globalUserdata"]) // Userdata returns nil
