@@ -7,42 +7,93 @@
 
 import Foundation
 
-/// Global debug configuration for LuaKit
-public struct LuaDebugConfig {
-    /// Enable debug logging globally
-    public static var isEnabled = false
-
+/// Global debug configuration for LuaKit.
+///
+/// Thread-safe for Swift 6 concurrency compliance.
+public struct LuaDebugConfig: Sendable {
     /// Log level for debug output
-    public enum LogLevel: Int {
+    public enum LogLevel: Int, Sendable {
         case verbose = 0
         case info = 1
         case warning = 2
         case error = 3
     }
 
+    /// Thread-safe storage for configuration
+    private final class Storage: @unchecked Sendable {
+        var isEnabled = false
+        var logLevel: LogLevel = .info
+        var logger: (@Sendable (String, LogLevel) -> Void)? = { message, level in
+            let prefix: String
+            switch level {
+            case .verbose:
+                prefix = "[VERBOSE]"
+            case .info:
+                prefix = "[INFO]"
+            case .warning:
+                prefix = "[WARNING]"
+            case .error:
+                prefix = "[ERROR]"
+            }
+            print("\(prefix) LuaKit: \(message)")
+        }
+        let lock = NSLock()
+
+        static let shared = Storage()
+    }
+
+    /// Enable debug logging globally
+    public static var isEnabled: Bool {
+        get {
+            Storage.shared.lock.lock()
+            defer { Storage.shared.lock.unlock() }
+            return Storage.shared.isEnabled
+        }
+        set {
+            Storage.shared.lock.lock()
+            defer { Storage.shared.lock.unlock() }
+            Storage.shared.isEnabled = newValue
+        }
+    }
+
     /// Current log level
-    public static var logLevel: LogLevel = .info
+    public static var logLevel: LogLevel {
+        get {
+            Storage.shared.lock.lock()
+            defer { Storage.shared.lock.unlock() }
+            return Storage.shared.logLevel
+        }
+        set {
+            Storage.shared.lock.lock()
+            defer { Storage.shared.lock.unlock() }
+            Storage.shared.logLevel = newValue
+        }
+    }
 
     /// Custom logger function
-    public static var logger: ((String, LogLevel) -> Void)? = { message, level in
-        let prefix: String
-        switch level {
-        case .verbose:
-            prefix = "[VERBOSE]"
-        case .info:
-            prefix = "[INFO]"
-        case .warning:
-            prefix = "[WARNING]"
-        case .error:
-            prefix = "[ERROR]"
+    public static var logger: (@Sendable (String, LogLevel) -> Void)? {
+        get {
+            Storage.shared.lock.lock()
+            defer { Storage.shared.lock.unlock() }
+            return Storage.shared.logger
         }
-        print("\(prefix) LuaKit: \(message)")
+        set {
+            Storage.shared.lock.lock()
+            defer { Storage.shared.lock.unlock() }
+            Storage.shared.logger = newValue
+        }
     }
 
     /// Log a message if debugging is enabled
     public static func log(_ message: String, level: LogLevel = .info) {
-        guard isEnabled && level.rawValue >= logLevel.rawValue else { return }
-        logger?(message, level)
+        Storage.shared.lock.lock()
+        let enabled = Storage.shared.isEnabled
+        let currentLevel = Storage.shared.logLevel
+        let loggerFn = Storage.shared.logger
+        Storage.shared.lock.unlock()
+
+        guard enabled && level.rawValue >= currentLevel.rawValue else { return }
+        loggerFn?(message, level)
     }
 }
 
@@ -65,7 +116,7 @@ public extension LuaDebuggable {
 }
 
 /// Debug context for method calls
-public struct LuaMethodDebugContext {
+public struct LuaMethodDebugContext: Sendable {
     public let className: String
     public let methodName: String
     public let parameters: [(name: String, value: String)]
@@ -103,7 +154,7 @@ public struct LuaMethodDebugContext {
 }
 
 /// Debug helpers for property access
-public struct LuaPropertyDebugContext {
+public struct LuaPropertyDebugContext: Sendable {
     public let className: String
     public let propertyName: String
     public let isGetter: Bool
@@ -137,34 +188,39 @@ public struct LuaPropertyDebugContext {
     }
 }
 
-/// Performance tracking for debug mode
-public class LuaPerformanceTracker {
-    private static var metrics: [String: (count: Int, totalTime: TimeInterval)] = [:]
-    private static let lock = NSLock()
+/// Performance tracking for debug mode.
+///
+/// Thread-safe via internal locking for Swift 6 concurrency compliance.
+public final class LuaPerformanceTracker: @unchecked Sendable {
+    private final class Storage: @unchecked Sendable {
+        var metrics: [String: (count: Int, totalTime: TimeInterval)] = [:]
+        let lock = NSLock()
+        static let shared = Storage()
+    }
 
     /// Track a method execution
     public static func track(className: String, methodName: String, duration: TimeInterval) {
         guard LuaDebugConfig.isEnabled else { return }
 
-        lock.lock()
-        defer { lock.unlock() }
+        Storage.shared.lock.lock()
+        defer { Storage.shared.lock.unlock() }
 
         let key = "\(className).\(methodName)"
-        if let existing = metrics[key] {
-            metrics[key] = (count: existing.count + 1, totalTime: existing.totalTime + duration)
+        if let existing = Storage.shared.metrics[key] {
+            Storage.shared.metrics[key] = (count: existing.count + 1, totalTime: existing.totalTime + duration)
         } else {
-            metrics[key] = (count: 1, totalTime: duration)
+            Storage.shared.metrics[key] = (count: 1, totalTime: duration)
         }
     }
 
     /// Get performance report
     public static func report() -> String {
-        lock.lock()
-        defer { lock.unlock() }
+        Storage.shared.lock.lock()
+        defer { Storage.shared.lock.unlock() }
 
         var report = "=== LuaKit Performance Report ===\n"
 
-        let sortedMetrics = metrics.sorted { $0.value.totalTime > $1.value.totalTime }
+        let sortedMetrics = Storage.shared.metrics.sorted { $0.value.totalTime > $1.value.totalTime }
 
         for (method, data) in sortedMetrics {
             let avgTime = data.totalTime / Double(data.count) * 1_000 // Convert to ms
@@ -178,47 +234,58 @@ public class LuaPerformanceTracker {
 
     /// Reset all metrics
     public static func reset() {
-        lock.lock()
-        defer { lock.unlock() }
-        metrics.removeAll()
+        Storage.shared.lock.lock()
+        defer { Storage.shared.lock.unlock() }
+        Storage.shared.metrics.removeAll()
     }
 }
 
-/// Memory tracking for debug mode
-public class LuaMemoryTracker {
-    private static var allocations: [String: Int] = [:]
-    private static let lock = NSLock()
+/// Memory tracking for debug mode.
+///
+/// Thread-safe via internal locking for Swift 6 concurrency compliance.
+public final class LuaMemoryTracker: @unchecked Sendable {
+    private final class Storage: @unchecked Sendable {
+        var allocations: [String: Int] = [:]
+        let lock = NSLock()
+        static let shared = Storage()
+    }
 
     /// Track object allocation
     public static func trackAllocation(_ className: String) {
         guard LuaDebugConfig.isEnabled else { return }
 
-        lock.lock()
-        defer { lock.unlock() }
+        Storage.shared.lock.lock()
+        defer { Storage.shared.lock.unlock() }
 
-        allocations[className, default: 0] += 1
-        LuaDebugConfig.log("\(className) - Instance allocated (total: \(allocations[className]!))", level: .verbose)
+        Storage.shared.allocations[className, default: 0] += 1
+        let count = Storage.shared.allocations[className]!
+        Storage.shared.lock.unlock()
+        LuaDebugConfig.log("\(className) - Instance allocated (total: \(count))", level: .verbose)
+        Storage.shared.lock.lock()
     }
 
     /// Track object deallocation
     public static func trackDeallocation(_ className: String) {
         guard LuaDebugConfig.isEnabled else { return }
 
-        lock.lock()
-        defer { lock.unlock() }
+        Storage.shared.lock.lock()
+        defer { Storage.shared.lock.unlock() }
 
-        allocations[className, default: 0] -= 1
-        LuaDebugConfig.log("\(className) - Instance deallocated (remaining: \(allocations[className]!))", level: .verbose)
+        Storage.shared.allocations[className, default: 0] -= 1
+        let count = Storage.shared.allocations[className]!
+        Storage.shared.lock.unlock()
+        LuaDebugConfig.log("\(className) - Instance deallocated (remaining: \(count))", level: .verbose)
+        Storage.shared.lock.lock()
     }
 
     /// Get memory report
     public static func report() -> String {
-        lock.lock()
-        defer { lock.unlock() }
+        Storage.shared.lock.lock()
+        defer { Storage.shared.lock.unlock() }
 
         var report = "=== LuaKit Memory Report ===\n"
 
-        let sortedAllocations = allocations.filter { $0.value > 0 }.sorted { $0.value > $1.value }
+        let sortedAllocations = Storage.shared.allocations.filter { $0.value > 0 }.sorted { $0.value > $1.value }
 
         for (className, count) in sortedAllocations {
             report += "\(className): \(count) instances\n"
@@ -229,9 +296,9 @@ public class LuaMemoryTracker {
 
     /// Reset all allocations
     public static func reset() {
-        lock.lock()
-        defer { lock.unlock() }
-        allocations.removeAll()
+        Storage.shared.lock.lock()
+        defer { Storage.shared.lock.unlock() }
+        Storage.shared.allocations.removeAll()
     }
 }
 

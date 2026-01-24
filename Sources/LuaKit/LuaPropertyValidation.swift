@@ -9,7 +9,7 @@ import Foundation
 import Lua
 
 /// Property validation result
-public enum LuaPropertyValidationResult {
+public enum LuaPropertyValidationResult: Sendable {
     case valid
     case invalid(reason: String)
 }
@@ -21,7 +21,7 @@ public protocol LuaPropertyValidator {
 }
 
 /// Built-in validators
-public struct LuaRangeValidator<T: Comparable>: LuaPropertyValidator {
+public struct LuaRangeValidator<T: Comparable & Sendable>: LuaPropertyValidator, Sendable {
     let min: T?
     let max: T?
 
@@ -41,7 +41,10 @@ public struct LuaRangeValidator<T: Comparable>: LuaPropertyValidator {
     }
 }
 
-public struct LuaRegexValidator: LuaPropertyValidator {
+/// Regex validator for string properties.
+/// Note: Uses `@unchecked Sendable` because NSRegularExpression is thread-safe
+/// but not marked as Sendable in Foundation.
+public struct LuaRegexValidator: LuaPropertyValidator, @unchecked Sendable {
     let pattern: String
     let regex: NSRegularExpression?
 
@@ -64,7 +67,7 @@ public struct LuaRegexValidator: LuaPropertyValidator {
     }
 }
 
-public struct LuaEnumPropertyValidator<T: LuaEnumBridgeable>: LuaPropertyValidator {
+public struct LuaEnumPropertyValidator<T: LuaEnumBridgeable>: LuaPropertyValidator, Sendable {
     public init() {}
 
     public func validate(_ value: String, propertyName: String) -> LuaPropertyValidationResult {
@@ -77,9 +80,35 @@ public struct LuaEnumPropertyValidator<T: LuaEnumBridgeable>: LuaPropertyValidat
     }
 }
 
-/// Property validation registry
-public class LuaPropertyValidationRegistry {
-    private static var validators: [String: Any] = [:]
+/// Property validation registry.
+///
+/// Thread-safe for Swift 6 concurrency compliance.
+public final class LuaPropertyValidationRegistry: @unchecked Sendable {
+    /// Thread-safe storage for validators
+    private final class Storage: @unchecked Sendable {
+        private var validators: [String: Any] = [:]
+        private let lock = NSLock()
+
+        static let shared = Storage()
+
+        func register(_ validator: Any, key: String) {
+            lock.lock()
+            defer { lock.unlock() }
+            validators[key] = validator
+        }
+
+        func getValidator(key: String) -> Any? {
+            lock.lock()
+            defer { lock.unlock() }
+            return validators[key]
+        }
+
+        func hasValidator(key: String) -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            return validators[key] != nil
+        }
+    }
 
     /// Register a validator for a property
     public static func register<V: LuaPropertyValidator>(
@@ -88,13 +117,13 @@ public class LuaPropertyValidationRegistry {
         property: String
     ) {
         let key = "\(className).\(property)"
-        validators[key] = validator
+        Storage.shared.register(validator, key: key)
     }
 
     /// Get validator for a property
     public static func getValidator(for className: String, property: String) -> Any? {
         let key = "\(className).\(property)"
-        return validators[key]
+        return Storage.shared.getValidator(key: key)
     }
 
     /// Validate a value (simplified implementation)
@@ -104,7 +133,7 @@ public class LuaPropertyValidationRegistry {
         property: String
     ) -> LuaPropertyValidationResult {
         let key = "\(className).\(property)"
-        guard validators[key] != nil else {
+        guard Storage.shared.hasValidator(key: key) else {
             return .valid // No validator registered
         }
 
@@ -142,7 +171,7 @@ public struct LuaReadOnlyProperty<T> {
 }
 
 /// Property metadata storage
-public struct LuaPropertyMetadata {
+public struct LuaPropertyMetadata: Sendable {
     public let name: String
     public let type: String
     public let isReadOnly: Bool
@@ -173,25 +202,51 @@ public struct LuaPropertyMetadata {
     }
 }
 
-/// Registry for property metadata
-public class LuaPropertyMetadataRegistry {
-    private static var metadata: [String: [LuaPropertyMetadata]] = [:]
+/// Registry for property metadata.
+///
+/// Thread-safe for Swift 6 concurrency compliance.
+public final class LuaPropertyMetadataRegistry: @unchecked Sendable {
+    /// Thread-safe storage for metadata
+    private final class Storage: @unchecked Sendable {
+        private var metadata: [String: [LuaPropertyMetadata]] = [:]
+        private let lock = NSLock()
+
+        static let shared = Storage()
+
+        func register(_ property: LuaPropertyMetadata, className: String) {
+            lock.lock()
+            defer { lock.unlock() }
+            if metadata[className] == nil {
+                metadata[className] = []
+            }
+            metadata[className]?.append(property)
+        }
+
+        func getMetadata(className: String) -> [LuaPropertyMetadata] {
+            lock.lock()
+            defer { lock.unlock() }
+            return metadata[className] ?? []
+        }
+
+        func getPropertyMetadata(className: String, property: String) -> LuaPropertyMetadata? {
+            lock.lock()
+            defer { lock.unlock() }
+            return metadata[className]?.first { $0.name == property }
+        }
+    }
 
     public static func register(_ property: LuaPropertyMetadata, for className: String) {
-        if metadata[className] == nil {
-            metadata[className] = []
-        }
-        metadata[className]?.append(property)
+        Storage.shared.register(property, className: className)
     }
 
     public static func getMetadata(for className: String) -> [LuaPropertyMetadata] {
-        return metadata[className] ?? []
+        return Storage.shared.getMetadata(className: className)
     }
 
     public static func getPropertyMetadata(
         for className: String,
         property: String
     ) -> LuaPropertyMetadata? {
-        return metadata[className]?.first { $0.name == property }
+        return Storage.shared.getPropertyMetadata(className: className, property: property)
     }
 }

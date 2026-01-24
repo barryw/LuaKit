@@ -16,25 +16,45 @@ public protocol LuaTypeConverter {
     static func convert(_ input: InputType) throws -> OutputType
 }
 
-/// Registry for custom type converters
-public class LuaTypeConverterRegistry {
-    private static var converters: [String: Any] = [:]
+/// Registry for custom type converters.
+///
+/// Thread-safe for Swift 6 concurrency compliance.
+public final class LuaTypeConverterRegistry: @unchecked Sendable {
+    /// Thread-safe storage for converters
+    private final class Storage: @unchecked Sendable {
+        private var converters: [String: Any] = [:]
+        private let lock = NSLock()
+
+        static let shared = Storage()
+
+        func register(_ converter: Any, name: String) {
+            lock.lock()
+            defer { lock.unlock() }
+            converters[name] = converter
+        }
+
+        func getConverter(named name: String) -> Any? {
+            lock.lock()
+            defer { lock.unlock() }
+            return converters[name]
+        }
+    }
 
     /// Register a custom converter
     public static func register<T: LuaTypeConverter>(_ converter: T.Type, name: String) {
-        converters[name] = converter
+        Storage.shared.register(converter, name: name)
     }
 
     /// Get a converter by name
     public static func getConverter(named name: String) -> Any? {
-        return converters[name]
+        return Storage.shared.getConverter(named: name)
     }
 }
 
 // MARK: - Built-in Type Converters
 
 /// String to UUID converter
-public struct StringToUUIDConverter: LuaTypeConverter {
+public struct StringToUUIDConverter: LuaTypeConverter, Sendable {
     public static func convert(_ input: String) throws -> UUID {
         guard let uuid = UUID(uuidString: input) else {
             throw LuaKitError.invalidArgument(
@@ -51,8 +71,10 @@ public struct StringToUUIDConverter: LuaTypeConverter {
 }
 
 /// String to Date converter (ISO8601)
-public struct StringToDateConverter: LuaTypeConverter {
-    private static let formatter: ISO8601DateFormatter = {
+public struct StringToDateConverter: LuaTypeConverter, Sendable {
+    /// ISO8601 date formatter. Using `nonisolated(unsafe)` because ISO8601DateFormatter
+    /// is thread-safe for reading but not marked as Sendable in Foundation.
+    private nonisolated(unsafe) static let formatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
@@ -75,7 +97,7 @@ public struct StringToDateConverter: LuaTypeConverter {
 }
 
 /// String to URL converter
-public struct StringToURLConverter: LuaTypeConverter {
+public struct StringToURLConverter: LuaTypeConverter, Sendable {
     public static func convert(_ input: String) throws -> URL {
         guard let url = URL(string: input) else {
             throw LuaKitError.invalidArgument(
@@ -92,7 +114,7 @@ public struct StringToURLConverter: LuaTypeConverter {
 }
 
 /// Number to TimeInterval converter
-public struct NumberToTimeIntervalConverter: LuaTypeConverter {
+public struct NumberToTimeIntervalConverter: LuaTypeConverter, Sendable {
     public static func convert(_ input: Double) throws -> TimeInterval {
         guard input >= 0 else {
             throw LuaKitError.invalidArgument(
@@ -231,7 +253,7 @@ extension Dictionary: LuaConvertible where Key == String, Value: LuaConvertible 
 // MARK: - Type Conversion Helpers
 
 /// Helper functions for type conversion
-public struct LuaConvert {
+public struct LuaConvert: Sendable {
     /// Convert a value using a registered converter
     public static func convert<T, U>(_ value: T, using converterName: String) throws -> U {
         guard let converterType = LuaTypeConverterRegistry.getConverter(named: converterName) else {

@@ -7,9 +7,58 @@
 
 @testable import LuaKit
 import XCTest
+import Foundation
 
+/// Thread-safe capture helper for test logging
+private final class MessageCapture: @unchecked Sendable {
+    private let lock = NSLock()
+    private var messages: [(String, LuaDebugConfig.LogLevel)] = []
+    private var lastMessage: String?
+    private var lastLevel: LuaDebugConfig.LogLevel?
+
+    func append(_ message: String, level: LuaDebugConfig.LogLevel) {
+        lock.lock()
+        defer { lock.unlock() }
+        messages.append((message, level))
+        lastMessage = message
+        lastLevel = level
+    }
+
+    var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return messages.count
+    }
+
+    var last: String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return lastMessage
+    }
+
+    var lastLogLevel: LuaDebugConfig.LogLevel? {
+        lock.lock()
+        defer { lock.unlock() }
+        return lastLevel
+    }
+
+    func get(at index: Int) -> (String, LuaDebugConfig.LogLevel)? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard index < messages.count else { return nil }
+        return messages[index]
+    }
+
+    func contains(where predicate: (String) -> Bool) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return messages.contains { predicate($0.0) }
+    }
+}
+
+@MainActor
 final class LuaDebugTests: XCTestCase {
-    private var originalLogger: ((String, LuaDebugConfig.LogLevel) -> Void)?
+    private var originalLogger: (@Sendable (String, LuaDebugConfig.LogLevel) -> Void)?
 
     override func setUp() {
         super.setUp()
@@ -41,10 +90,10 @@ final class LuaDebugTests: XCTestCase {
     }
 
     func testDebugLogging() {
-        var capturedMessages: [(String, LuaDebugConfig.LogLevel)] = []
+        let capture = MessageCapture()
 
         LuaDebugConfig.logger = { message, level in
-            capturedMessages.append((message, level))
+            capture.append(message, level: level)
         }
 
         LuaDebugConfig.isEnabled = true
@@ -56,18 +105,18 @@ final class LuaDebugTests: XCTestCase {
         LuaDebugConfig.log("Error message", level: .error)
 
         // With default log level (.info), verbose should be filtered out
-        XCTAssertEqual(capturedMessages.count, 3)
-        XCTAssertTrue(capturedMessages[0].0.contains("Info message"))
-        XCTAssertEqual(capturedMessages[0].1, .info)
-        XCTAssertTrue(capturedMessages[1].0.contains("Warning message"))
-        XCTAssertEqual(capturedMessages[1].1, .warning)
-        XCTAssertTrue(capturedMessages[2].0.contains("Error message"))
-        XCTAssertEqual(capturedMessages[2].1, .error)
+        XCTAssertEqual(capture.count, 3)
+        XCTAssertTrue(capture.get(at: 0)?.0.contains("Info message") ?? false)
+        XCTAssertEqual(capture.get(at: 0)?.1, .info)
+        XCTAssertTrue(capture.get(at: 1)?.0.contains("Warning message") ?? false)
+        XCTAssertEqual(capture.get(at: 1)?.1, .warning)
+        XCTAssertTrue(capture.get(at: 2)?.0.contains("Error message") ?? false)
+        XCTAssertEqual(capture.get(at: 2)?.1, .error)
     }
 
     func testLogLevelFiltering() {
-        var capturedCount = 0
-        LuaDebugConfig.logger = { _, _ in capturedCount += 1 }
+        let capture = MessageCapture()
+        LuaDebugConfig.logger = { message, level in capture.append(message, level: level) }
         LuaDebugConfig.isEnabled = true
 
         // Set to error level - only error messages should pass
@@ -78,17 +127,17 @@ final class LuaDebugTests: XCTestCase {
         LuaDebugConfig.log("Warning", level: .warning)
         LuaDebugConfig.log("Error", level: .error)
 
-        XCTAssertEqual(capturedCount, 1)
+        XCTAssertEqual(capture.count, 1)
     }
 
     func testDebugDisabled() {
-        var capturedCount = 0
-        LuaDebugConfig.logger = { _, _ in capturedCount += 1 }
+        let capture = MessageCapture()
+        LuaDebugConfig.logger = { message, level in capture.append(message, level: level) }
         LuaDebugConfig.isEnabled = false
 
         LuaDebugConfig.log("Should not log", level: .error)
 
-        XCTAssertEqual(capturedCount, 0)
+        XCTAssertEqual(capture.count, 0)
     }
 
     // MARK: - LuaDebuggable Tests
@@ -98,39 +147,35 @@ final class LuaDebugTests: XCTestCase {
     }
 
     func testLuaDebuggable() {
-        var capturedMessage: String?
-        LuaDebugConfig.logger = { message, _ in
-            capturedMessage = message
-        }
+        let capture = MessageCapture()
+        LuaDebugConfig.logger = { message, level in capture.append(message, level: level) }
         LuaDebugConfig.isEnabled = true
 
         let debuggable = TestDebuggable()
         debuggable.luaDebugLog("Test message")
 
-        XCTAssertNotNil(capturedMessage)
-        XCTAssertTrue(capturedMessage!.contains("[TestDebuggable]"))
-        XCTAssertTrue(capturedMessage!.contains("Test message"))
+        XCTAssertNotNil(capture.last)
+        XCTAssertTrue(capture.last!.contains("[TestDebuggable]"))
+        XCTAssertTrue(capture.last!.contains("Test message"))
     }
 
     func testLuaDebuggableDisabled() {
-        var capturedCount = 0
-        LuaDebugConfig.logger = { _, _ in capturedCount += 1 }
+        let capture = MessageCapture()
+        LuaDebugConfig.logger = { message, level in capture.append(message, level: level) }
         LuaDebugConfig.isEnabled = true
 
         let debuggable = TestDebuggable()
         debuggable.luaDebugEnabled = false
         debuggable.luaDebugLog("Should not log")
 
-        XCTAssertEqual(capturedCount, 0)
+        XCTAssertEqual(capture.count, 0)
     }
 
     // MARK: - LuaMethodDebugContext Tests
 
     func testMethodDebugContextEntry() {
-        var capturedMessage: String?
-        LuaDebugConfig.logger = { message, _ in
-            capturedMessage = message
-        }
+        let capture = MessageCapture()
+        LuaDebugConfig.logger = { message, level in capture.append(message, level: level) }
         LuaDebugConfig.isEnabled = true
         LuaDebugConfig.logLevel = .verbose
 
@@ -142,18 +187,16 @@ final class LuaDebugTests: XCTestCase {
 
         context.logEntry()
 
-        XCTAssertNotNil(capturedMessage)
-        XCTAssertTrue(capturedMessage!.contains("TestClass.testMethod"))
-        XCTAssertTrue(capturedMessage!.contains("param1: value1"))
-        XCTAssertTrue(capturedMessage!.contains("param2: 42"))
-        XCTAssertTrue(capturedMessage!.contains("Started"))
+        XCTAssertNotNil(capture.last)
+        XCTAssertTrue(capture.last!.contains("TestClass.testMethod"))
+        XCTAssertTrue(capture.last!.contains("param1: value1"))
+        XCTAssertTrue(capture.last!.contains("param2: 42"))
+        XCTAssertTrue(capture.last!.contains("Started"))
     }
 
     func testMethodDebugContextExit() {
-        var capturedMessage: String?
-        LuaDebugConfig.logger = { message, _ in
-            capturedMessage = message
-        }
+        let capture = MessageCapture()
+        LuaDebugConfig.logger = { message, level in capture.append(message, level: level) }
         LuaDebugConfig.isEnabled = true
         LuaDebugConfig.logLevel = .verbose
 
@@ -167,20 +210,16 @@ final class LuaDebugTests: XCTestCase {
 
         context.logExit(result: "Success")
 
-        XCTAssertNotNil(capturedMessage)
-        XCTAssertTrue(capturedMessage!.contains("TestClass.testMethod"))
-        XCTAssertTrue(capturedMessage!.contains("Completed in"))
-        XCTAssertTrue(capturedMessage!.contains("ms"))
-        XCTAssertTrue(capturedMessage!.contains("returned: Success"))
+        XCTAssertNotNil(capture.last)
+        XCTAssertTrue(capture.last!.contains("TestClass.testMethod"))
+        XCTAssertTrue(capture.last!.contains("Completed in"))
+        XCTAssertTrue(capture.last!.contains("ms"))
+        XCTAssertTrue(capture.last!.contains("returned: Success"))
     }
 
     func testMethodDebugContextError() {
-        var capturedMessage: String?
-        var capturedLevel: LuaDebugConfig.LogLevel?
-        LuaDebugConfig.logger = { message, level in
-            capturedMessage = message
-            capturedLevel = level
-        }
+        let capture = MessageCapture()
+        LuaDebugConfig.logger = { message, level in capture.append(message, level: level) }
         LuaDebugConfig.isEnabled = true
 
         let context = LuaMethodDebugContext(
@@ -190,19 +229,17 @@ final class LuaDebugTests: XCTestCase {
 
         context.logError("Something went wrong")
 
-        XCTAssertNotNil(capturedMessage)
-        XCTAssertTrue(capturedMessage!.contains("TestClass.testMethod"))
-        XCTAssertTrue(capturedMessage!.contains("ERROR: Something went wrong"))
-        XCTAssertEqual(capturedLevel, .error)
+        XCTAssertNotNil(capture.last)
+        XCTAssertTrue(capture.last!.contains("TestClass.testMethod"))
+        XCTAssertTrue(capture.last!.contains("ERROR: Something went wrong"))
+        XCTAssertEqual(capture.lastLogLevel, .error)
     }
 
     // MARK: - LuaPropertyDebugContext Tests
 
     func testPropertyDebugContextGetter() {
-        var capturedMessage: String?
-        LuaDebugConfig.logger = { message, _ in
-            capturedMessage = message
-        }
+        let capture = MessageCapture()
+        LuaDebugConfig.logger = { message, level in capture.append(message, level: level) }
         LuaDebugConfig.isEnabled = true
         LuaDebugConfig.logLevel = .verbose
 
@@ -214,16 +251,14 @@ final class LuaDebugTests: XCTestCase {
 
         context.logAccess(value: "propertyValue")
 
-        XCTAssertNotNil(capturedMessage)
-        XCTAssertTrue(capturedMessage!.contains("TestClass.testProperty"))
-        XCTAssertTrue(capturedMessage!.contains("Read value: propertyValue"))
+        XCTAssertNotNil(capture.last)
+        XCTAssertTrue(capture.last!.contains("TestClass.testProperty"))
+        XCTAssertTrue(capture.last!.contains("Read value: propertyValue"))
     }
 
     func testPropertyDebugContextSetter() {
-        var capturedMessage: String?
-        LuaDebugConfig.logger = { message, _ in
-            capturedMessage = message
-        }
+        let capture = MessageCapture()
+        LuaDebugConfig.logger = { message, level in capture.append(message, level: level) }
         LuaDebugConfig.isEnabled = true
         LuaDebugConfig.logLevel = .verbose
 
@@ -235,18 +270,14 @@ final class LuaDebugTests: XCTestCase {
 
         context.logAccess(value: "newValue")
 
-        XCTAssertNotNil(capturedMessage)
-        XCTAssertTrue(capturedMessage!.contains("TestClass.testProperty"))
-        XCTAssertTrue(capturedMessage!.contains("Set value: newValue"))
+        XCTAssertNotNil(capture.last)
+        XCTAssertTrue(capture.last!.contains("TestClass.testProperty"))
+        XCTAssertTrue(capture.last!.contains("Set value: newValue"))
     }
 
     func testPropertyValidationFailure() {
-        var capturedMessage: String?
-        var capturedLevel: LuaDebugConfig.LogLevel?
-        LuaDebugConfig.logger = { message, level in
-            capturedMessage = message
-            capturedLevel = level
-        }
+        let capture = MessageCapture()
+        LuaDebugConfig.logger = { message, level in capture.append(message, level: level) }
         LuaDebugConfig.isEnabled = true
 
         let context = LuaPropertyDebugContext(
@@ -257,12 +288,12 @@ final class LuaDebugTests: XCTestCase {
 
         context.logValidationFailure(value: "-5", reason: "Age must be positive")
 
-        XCTAssertNotNil(capturedMessage)
-        XCTAssertTrue(capturedMessage!.contains("TestClass.age"))
-        XCTAssertTrue(capturedMessage!.contains("Validation failed"))
-        XCTAssertTrue(capturedMessage!.contains("'-5'"))
-        XCTAssertTrue(capturedMessage!.contains("Age must be positive"))
-        XCTAssertEqual(capturedLevel, .warning)
+        XCTAssertNotNil(capture.last)
+        XCTAssertTrue(capture.last!.contains("TestClass.age"))
+        XCTAssertTrue(capture.last!.contains("Validation failed"))
+        XCTAssertTrue(capture.last!.contains("'-5'"))
+        XCTAssertTrue(capture.last!.contains("Age must be positive"))
+        XCTAssertEqual(capture.lastLogLevel, .warning)
     }
 
     // MARK: - LuaPerformanceTracker Tests
@@ -309,10 +340,8 @@ final class LuaDebugTests: XCTestCase {
         // Reset any existing allocations from other tests
         LuaMemoryTracker.reset()
 
-        var capturedMessages: [String] = []
-        LuaDebugConfig.logger = { message, _ in
-            capturedMessages.append(message)
-        }
+        let capture = MessageCapture()
+        LuaDebugConfig.logger = { message, level in capture.append(message, level: level) }
         LuaDebugConfig.isEnabled = true
         LuaDebugConfig.logLevel = .verbose
 
@@ -328,9 +357,9 @@ final class LuaDebugTests: XCTestCase {
         XCTAssertTrue(report.contains("OtherClass: 1 instances"))
 
         // Check log messages
-        XCTAssertTrue(capturedMessages.contains { $0.contains("TestClass - Instance allocated (total: 1)") })
-        XCTAssertTrue(capturedMessages.contains { $0.contains("TestClass - Instance allocated (total: 2)") })
-        XCTAssertTrue(capturedMessages.contains { $0.contains("TestClass - Instance deallocated (remaining: 1)") })
+        XCTAssertTrue(capture.contains { $0.contains("TestClass - Instance allocated (total: 1)") })
+        XCTAssertTrue(capture.contains { $0.contains("TestClass - Instance allocated (total: 2)") })
+        XCTAssertTrue(capture.contains { $0.contains("TestClass - Instance deallocated (remaining: 1)") })
     }
 
     // MARK: - LuaState Extension Tests

@@ -5,24 +5,84 @@
 //  Tests for LuaAsyncSupport functionality
 //
 
+import Foundation
 @testable import LuaKit
 import XCTest
 
+/// Thread-safe capture helper for async test results
+private final class AsyncResultCapture: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _result: Any?
+    private var _error: Error?
+
+    var result: Any? {
+        lock.lock()
+        defer { lock.unlock() }
+        return _result
+    }
+
+    var error: Error? {
+        lock.lock()
+        defer { lock.unlock() }
+        return _error
+    }
+
+    func set(result: Any?, error: Error?) {
+        lock.lock()
+        defer { lock.unlock() }
+        _result = result
+        _error = error
+    }
+}
+
+/// Thread-safe counter for testing
+private final class AtomicCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _value: Int = 0
+
+    var value: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return _value
+    }
+
+    func increment() {
+        lock.lock()
+        defer { lock.unlock() }
+        _value += 1
+    }
+}
+
+/// Thread-safe boolean flag
+private final class AtomicFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _value: Bool = false
+
+    var value: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return _value
+    }
+
+    func set(_ newValue: Bool) {
+        lock.lock()
+        defer { lock.unlock() }
+        _value = newValue
+    }
+}
+
+@MainActor
 final class LuaAsyncSupportTests: XCTestCase {
     var lua: LuaState!
 
-    override func setUp() {
-        super.setUp()
-        do {
-            lua = try LuaState()
-        } catch {
-            XCTFail("Failed to create LuaState: \(error)")
-        }
+    override func setUp() async throws {
+        try await super.setUp()
+        lua = try LuaState()
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         lua = nil
-        super.tearDown()
+        try await super.tearDown()
     }
 
     // MARK: - LuaAsyncHandle Tests
@@ -36,21 +96,19 @@ final class LuaAsyncSupportTests: XCTestCase {
         let handle = LuaAsyncHandle()
         let expectation = self.expectation(description: "Async completion")
 
-        var receivedResult: Any?
-        var receivedError: Error?
+        let capture = AsyncResultCapture()
 
         handle.onComplete { result, error in
-            receivedResult = result
-            receivedError = error
+            capture.set(result: result, error: error)
             expectation.fulfill()
         }
 
         handle.complete(result: "Success", error: nil)
 
         waitForExpectations(timeout: 1.0) { _ in
-            XCTAssertNotNil(receivedResult)
-            XCTAssertEqual(receivedResult as? String, "Success")
-            XCTAssertNil(receivedError)
+            XCTAssertNotNil(capture.result)
+            XCTAssertEqual(capture.result as? String, "Success")
+            XCTAssertNil(capture.error)
         }
     }
 
@@ -74,10 +132,10 @@ final class LuaAsyncSupportTests: XCTestCase {
 
     func testAsyncHandleDoubleCompletion() {
         let handle = LuaAsyncHandle()
-        var callCount = 0
+        let callCounter = AtomicCounter()
 
         handle.onComplete { _, _ in
-            callCount += 1
+            callCounter.increment()
         }
 
         // First completion should work
@@ -93,7 +151,7 @@ final class LuaAsyncSupportTests: XCTestCase {
         }
 
         waitForExpectations(timeout: 1.0) { _ in
-            XCTAssertEqual(callCount, 1)
+            XCTAssertEqual(callCounter.value, 1)
         }
     }
 
@@ -268,11 +326,11 @@ final class LuaAsyncSupportTests: XCTestCase {
 
     func testAsyncWrapper() {
         let expectation = self.expectation(description: "Async wrapper")
-        var didExecute = false
+        let didExecuteFlag = AtomicFlag()
 
-        let asyncFunc: () async throws -> String = {
+        let asyncFunc: @Sendable () async throws -> String = {
             try await Task.sleep(nanoseconds: 10_000_000) // 10ms
-            didExecute = true
+            didExecuteFlag.set(true)
             return "Async Result"
         }
 
@@ -285,7 +343,7 @@ final class LuaAsyncSupportTests: XCTestCase {
         }
 
         waitForExpectations(timeout: 1.0) { _ in
-            XCTAssertTrue(didExecute)
+            XCTAssertTrue(didExecuteFlag.value)
         }
     }
 
@@ -296,7 +354,7 @@ final class LuaAsyncSupportTests: XCTestCase {
             case testError
         }
 
-        let asyncFunc: () async throws -> String = {
+        let asyncFunc: @Sendable () async throws -> String = {
             throw TestError.testError
         }
 
@@ -353,7 +411,12 @@ final class LuaAsyncSupportTests: XCTestCase {
 
         // This demonstrates a pattern for async operations
         let expectation = self.expectation(description: "Async pattern")
-        var luaCallbackResult: String?
+
+        // Use a class box for thread-safe capture
+        final class ResultBox: @unchecked Sendable {
+            var value: String?
+        }
+        let resultBox = ResultBox()
 
         // Register a callback handler with a simple approach
         lua.registerFunction("setAsyncCallback") { (handleId: String) in
@@ -364,9 +427,9 @@ final class LuaAsyncSupportTests: XCTestCase {
 
             handle.onComplete { result, error in
                 if let result = result as? String {
-                    luaCallbackResult = "Received: \(result)"
+                    resultBox.value = "Received: \(result)"
                 } else if let error = error {
-                    luaCallbackResult = "Error: \(error.localizedDescription)"
+                    resultBox.value = "Error: \(error.localizedDescription)"
                 }
                 expectation.fulfill()
             }
@@ -390,7 +453,7 @@ final class LuaAsyncSupportTests: XCTestCase {
         }
 
         waitForExpectations(timeout: 1.0) { _ in
-            XCTAssertEqual(luaCallbackResult, "Received: Async Data")
+            XCTAssertEqual(resultBox.value, "Received: Async Data")
         }
     }
 }
