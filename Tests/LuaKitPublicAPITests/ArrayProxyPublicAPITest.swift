@@ -10,6 +10,45 @@ import Lua
 import LuaKit  // NOT @testable - testing public API only
 import XCTest
 
+// Moved out of functions for Swift 6 compatibility
+// Using unique names to avoid conflicts with other test files
+
+@LuaBridgeable
+class PublicAPIColorPalette: LuaBridgeable {
+    var name: String
+    var colors: [String]
+
+    init(name: String = "Untitled") {
+        self.name = name
+        self.colors = []
+    }
+
+    var description: String {
+        return "PublicAPIColorPalette(\(name): \(colors.count) colors)"
+    }
+}
+
+@LuaBridgeable
+class PublicAPIDataContainer: LuaBridgeable {
+    var strings: [String] = []
+    var integers: [Int] = []
+    var doubles: [Double] = []
+    var booleans: [Bool] = []
+
+    init() {}
+
+    var description: String {
+        return "PublicAPIDataContainer"
+    }
+}
+
+@LuaBridgeable
+class PublicAPITestClass: LuaBridgeable {
+    var items: [String] = []
+    init() {}
+    var description: String { return "PublicAPITestClass" }
+}
+
 class ArrayProxyPublicAPITest: XCTestCase {
     func testArrayElementAccessFromPublicAPI() throws {
         // This test verifies that array element access works
@@ -17,24 +56,8 @@ class ArrayProxyPublicAPITest: XCTestCase {
 
         let lua = try LuaState()
 
-        // Define a class as an external consumer would
-        @LuaBridgeable
-        class ColorPalette: LuaBridgeable {
-            var name: String
-            var colors: [String]
-
-            init(name: String = "Untitled") {
-                self.name = name
-                self.colors = []
-            }
-
-            var description: String {
-                return "ColorPalette(\(name): \(colors.count) colors)"
-            }
-        }
-
         // Register the class
-        lua.register(ColorPalette.self, as: "ColorPalette")
+        lua.register(PublicAPIColorPalette.self, as: "ColorPalette")
 
         // This is the exact scenario that was failing in 1.1.0
         let output = try lua.execute("""
@@ -71,22 +94,7 @@ class ArrayProxyPublicAPITest: XCTestCase {
 
     func testAllArrayTypes() throws {
         let lua = try LuaState()
-
-        @LuaBridgeable
-        class DataContainer: LuaBridgeable {
-            var strings: [String] = []
-            var integers: [Int] = []
-            var doubles: [Double] = []
-            var booleans: [Bool] = []
-
-            init() {}
-
-            var description: String {
-                return "DataContainer"
-            }
-        }
-
-        lua.register(DataContainer.self, as: "DataContainer")
+        lua.register(PublicAPIDataContainer.self, as: "DataContainer")
 
         let output = try lua.execute("""
             local data = DataContainer.new()
@@ -123,15 +131,7 @@ class ArrayProxyPublicAPITest: XCTestCase {
         // initializer is public and can be accessed by macro-generated code
 
         let lua = try LuaState()
-
-        @LuaBridgeable
-        class TestClass: LuaBridgeable {
-            var items: [String] = []
-            init() {}
-            var description: String { return "TestClass" }
-        }
-
-        lua.register(TestClass.self, as: "TestClass")
+        lua.register(PublicAPITestClass.self, as: "TestClass")
 
         // If the initializer is internal, this will fail with:
         // "LuaStringArrayProxy initializer is inaccessible due to 'internal' protection level"

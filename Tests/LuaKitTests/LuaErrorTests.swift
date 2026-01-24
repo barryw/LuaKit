@@ -109,6 +109,8 @@ final class LuaErrorTests: XCTestCase {
             .runtime("runtime issue"),
             .typeMismatch(expected: "bool", got: "nil"),
             .invalidArgument("bad arg"),
+            .stateInvalid,
+            .coroutineError("coroutine issue"),
             .custom("custom")
         ]
 
@@ -118,6 +120,9 @@ final class LuaErrorTests: XCTestCase {
             "runtime": 0,
             "typeMismatch": 0,
             "invalidArgument": 0,
+            "functionNotFound": 0,
+            "stateInvalid": 0,
+            "coroutineError": 0,
             "custom": 0
         ]
 
@@ -133,6 +138,12 @@ final class LuaErrorTests: XCTestCase {
                 counts["typeMismatch"]! += 1
             case .invalidArgument:
                 counts["invalidArgument"]! += 1
+            case .functionNotFound:
+                counts["functionNotFound"]! += 1
+            case .stateInvalid:
+                counts["stateInvalid"]! += 1
+            case .coroutineError:
+                counts["coroutineError"]! += 1
             case .custom:
                 counts["custom"]! += 1
             }
@@ -143,6 +154,27 @@ final class LuaErrorTests: XCTestCase {
         XCTAssertEqual(counts["runtime"], 1)
         XCTAssertEqual(counts["typeMismatch"], 1)
         XCTAssertEqual(counts["invalidArgument"], 1)
+        XCTAssertEqual(counts["stateInvalid"], 1)
+        XCTAssertEqual(counts["coroutineError"], 1)
         XCTAssertEqual(counts["custom"], 1)
+    }
+
+    func testStateInvalidError() {
+        let error = LuaError.stateInvalid
+        XCTAssertEqual(error.errorDescription, "Lua state is no longer valid")
+        XCTAssertEqual(error.localizedDescription, "Lua state is no longer valid")
+    }
+
+    func testCoroutineError() {
+        let message = "coroutine cannot be resumed"
+        let error = LuaError.coroutineError(message)
+        XCTAssertEqual(error.errorDescription, "Coroutine error: coroutine cannot be resumed")
+        XCTAssertEqual(error.localizedDescription, "Coroutine error: coroutine cannot be resumed")
+    }
+
+    func testTypeMismatchWithContext() {
+        let error = LuaError.typeMismatch(expected: "number", actual: "string", context: "function argument")
+        XCTAssertEqual(error.errorDescription, "Type mismatch in function argument: expected number, got string")
+        XCTAssertEqual(error.localizedDescription, "Type mismatch in function argument: expected number, got string")
     }
 }

@@ -99,13 +99,13 @@ extension LuaState {
     /// Register async support functions
     public func registerAsyncSupport() {
         // Register helper functions for async operations
-        registerFunction("createAsyncHandle") { () -> String in
+        register(function: "createAsyncHandle") { () -> String in
             let handle = LuaAsyncHandle()
             let id = LuaAsyncRegistry.register(handle)
             return id.uuidString
         }
 
-        registerFunction("completeAsync") { (handleId: String, result: String?, error: String?) in
+        register(function: "completeAsync") { (handleId: String, result: String?, error: String?) in
             guard let uuid = UUID(uuidString: handleId),
                   let handle = LuaAsyncRegistry.get(uuid) else {
                 return

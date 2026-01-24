@@ -74,10 +74,16 @@ final class LuaGlobalsAdvancedTests: XCTestCase {
     }
 
     func testGlobalsExtractValueEdgeCases() {
-        // Test table extraction
+        // Test table extraction - now properly extracts as dictionary
         _ = try? lua.execute("globalTable = {a = 1, b = 2}")
         let tableValue = lua.globals["globalTable"]
-        XCTAssertEqual(tableValue as? String, "<table>")
+        XCTAssertNotNil(tableValue)
+        if let dict = tableValue as? [String: Any] {
+            XCTAssertEqual(dict["a"] as? Int, 1)
+            XCTAssertEqual(dict["b"] as? Int, 2)
+        } else {
+            XCTFail("Expected dictionary")
+        }
 
         // Test function extraction
         _ = try? lua.execute("globalFunc = function() end")
@@ -216,9 +222,13 @@ final class LuaGlobalsAdvancedTests: XCTestCase {
         // Skip storing reference - requires LuaBridgeable
         // table["ref"] = ref
 
-        // Verify storage - functions and tables return nil when retrieved
-        XCTAssertNil(table["func"]) // Functions return nil
-        XCTAssertNil(table["subtable"]) // Tables return nil
+        // Verify storage - functions return metadata, tables return content
+        let funcResult = table["func"]
+        XCTAssertNotNil(funcResult) // Functions now return metadata
+
+        let subtableResult = table["subtable"] as? [String: Any]
+        XCTAssertNotNil(subtableResult)
+        XCTAssertEqual(subtableResult?["nested"] as? Bool, true)
         // XCTAssertNotNil(table["ref"]) - skipped, requires LuaBridgeable
     }
 
@@ -288,9 +298,10 @@ final class LuaGlobalsAdvancedTests: XCTestCase {
             }
         """)
 
-        // Access through globals (returns "<table>")
-        let tableDesc = lua.globals["myGlobalTable"] as? String
-        XCTAssertEqual(tableDesc, "<table>")
+        // Access through globals - now properly extracts table contents
+        let tableDict = lua.globals["myGlobalTable"] as? [String: Any]
+        XCTAssertNotNil(tableDict)
+        XCTAssertEqual(tableDict?["mixed"] as? Int, 123)
 
         // Create Swift table and assign to global
         let swiftTable = lua.createTable()

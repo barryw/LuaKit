@@ -15,9 +15,9 @@ class TrackingModel: LuaBridgeable {
     var name: String
     var value: Int
 
-    // Track changes for testing
-    var changeHistory: [(property: String, oldValue: Any?, newValue: Any?)] = []
-    var rejectedChanges: [(property: String, attemptedValue: Any?)] = []
+    // Track changes for testing - private to exclude from bridging
+    private(set) var changeHistory: [(property: String, oldValue: Any?, newValue: Any?)] = []
+    private(set) var rejectedChanges: [(property: String, attemptedValue: Any?)] = []
 
     init(name: String = "Untitled", value: Int = 0) {
         self.name = name
@@ -43,14 +43,46 @@ class TrackingModel: LuaBridgeable {
     }
 }
 
+/// Thread-safe storage for persisted data
+final class PersistedDataStorage: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _data: [String: Any] = [:]
+
+    var data: [String: Any] {
+        lock.lock()
+        defer { lock.unlock() }
+        return _data
+    }
+
+    subscript(key: String) -> Any? {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return _data[key]
+        }
+        set {
+            lock.lock()
+            defer { lock.unlock() }
+            _data[key] = newValue
+        }
+    }
+
+    func removeAll() {
+        lock.lock()
+        defer { lock.unlock() }
+        _data.removeAll()
+    }
+}
+
 // Test class that simulates persistence
 @LuaBridgeable
 class PersistentModel: LuaBridgeable {
     var data: String
-    var isDirty: Bool = false
+    private(set) var isDirty: Bool = false
 
-    // Simulated persistence store
-    static var persistedData: [String: Any] = [:]
+    // Simulated persistence store - thread-safe
+    private static let _persistedData = PersistedDataStorage()
+    static var persistedData: PersistedDataStorage { _persistedData }
 
     init(data: String = "empty") {
         self.data = data
@@ -86,9 +118,35 @@ class DefaultBehaviorModel: LuaBridgeable {
     }
 }
 
+// Tracking person for testMultiplePropertyTypes - moved out of function for Swift 6
+@LuaBridgeable
+class TrackingPerson: LuaBridgeable {
+    var name: String
+    var age: Int
+    var active: Bool
+    var score: Double
+
+    private(set) var changes: [String] = []
+
+    init(name: String = "Anonymous", age: Int = 0) {
+        self.name = name
+        self.age = age
+        self.active = true
+        self.score = 0.0
+    }
+
+    func luaPropertyDidChange(_ propertyName: String, from oldValue: Any?, to newValue: Any?) {
+        changes.append("\(propertyName): \(String(describing: oldValue)) -> \(String(describing: newValue))")
+    }
+
+    var description: String {
+        return "TrackingPerson(name: \(name), age: \(age))"
+    }
+}
+
 class PropertyChangeTests: XCTestCase {
     override func setUp() {
-        // Skip these tests for now due to macro issues
+        super.setUp()
         continueAfterFailure = false
     }
 
@@ -193,36 +251,6 @@ class PropertyChangeTests: XCTestCase {
 
     func testMultiplePropertyTypes() throws {
         let lua = try LuaState()
-
-        // Test with the MacroTestPerson class which has different property types
-        lua.register(MacroTestPerson.self, as: "Person")
-
-        // Create a custom tracking person
-        @LuaBridgeable
-        class TrackingPerson: LuaBridgeable {
-            var name: String
-            var age: Int
-            var active: Bool
-            var score: Double
-
-            var changes: [String] = []
-
-            init(name: String = "Anonymous", age: Int = 0) {
-                self.name = name
-                self.age = age
-                self.active = true
-                self.score = 0.0
-            }
-
-            func luaPropertyDidChange(_ propertyName: String, from oldValue: Any?, to newValue: Any?) {
-                changes.append("\(propertyName): \(String(describing: oldValue)) -> \(String(describing: newValue))")
-            }
-
-            var description: String {
-                return "TrackingPerson(name: \(name), age: \(age))"
-            }
-        }
-
         lua.register(TrackingPerson.self, as: "TrackingPerson")
 
         let person = TrackingPerson(name: "John", age: 30)

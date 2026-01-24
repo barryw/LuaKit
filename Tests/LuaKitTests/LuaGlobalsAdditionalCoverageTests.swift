@@ -259,10 +259,17 @@ final class LuaGlobalsAdditionalCoverageTests: XCTestCase {
         XCTAssertEqual(table["string"] as? String, "test")
         XCTAssertNil(table["nil"])
 
-        // Functions, tables, and userdata return nil when extracted
-        XCTAssertNil(table["func"])
+        // Functions now return metadata, tables return content
+        let funcResult = table["func"]
+        XCTAssertNotNil(funcResult)
+
+        // Nested tables now return their contents
+        let nestedResult = table["nested"] as? [String: Any]
+        XCTAssertNotNil(nestedResult)
+        XCTAssertEqual(nestedResult?["inner"] as? String, "nested value")
+
+        // Bridgeables and refs may still return nil depending on implementation
         XCTAssertNil(table["bridgeable"])
-        XCTAssertNil(table["nested"])
         XCTAssertNil(table["ref"])
         XCTAssertNil(table["unsupported"])
     }

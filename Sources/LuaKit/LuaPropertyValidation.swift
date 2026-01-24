@@ -67,7 +67,7 @@ public struct LuaRegexValidator: LuaPropertyValidator, @unchecked Sendable {
     }
 }
 
-public struct LuaEnumPropertyValidator<T: LuaEnumBridgeable>: LuaPropertyValidator, Sendable {
+public struct LuaEnumPropertyValidator<T: LuaBridgeableEnum>: LuaPropertyValidator, Sendable {
     public init() {}
 
     public func validate(_ value: String, propertyName: String) -> LuaPropertyValidationResult {

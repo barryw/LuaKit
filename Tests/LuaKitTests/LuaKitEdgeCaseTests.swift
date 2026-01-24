@@ -139,9 +139,12 @@ final class LuaKitEdgeCaseTests: XCTestCase {
             getmetatable(testFullUserdata).__tostring = function() return "custom userdata" end
         """)
 
-        // Test extraction
+        // Test extraction - tables are now properly extracted
         let tableValue = lua.globals["testTable"]
-        XCTAssertEqual(tableValue as? String, "<table>")
+        XCTAssertNotNil(tableValue)
+        if let dict = tableValue as? [String: Any] {
+            XCTAssertNotNil(dict["nested"])
+        }
 
         let closureValue = lua.globals["testClosure"]
         XCTAssertNil(closureValue) // Functions return nil

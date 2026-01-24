@@ -77,6 +77,16 @@ public final class LuaState {
     /// Type alias for output handlers that receive print output immediately
     public typealias PrintOutputHandler = (String) -> Void
 
+    /// Set a handler to receive Lua print output.
+    ///
+    /// The handler is called each time Lua's `print()` function is invoked.
+    ///
+    /// - Parameter handler: A closure that receives each line of print output.
+    public func onPrint(_ handler: @escaping (String) -> Void) {
+        self.printHandler = handler
+    }
+
+    @available(*, deprecated, renamed: "onPrint(_:)")
     public func setPrintHandler(_ handler: @escaping (String) -> Void) {
         self.printHandler = handler
     }
@@ -86,7 +96,7 @@ public final class LuaState {
         self.printBufferPolicy = policy
     }
 
-    /// Set the output handler for streaming print output (replaces setPrintHandler with better naming)
+    @available(*, deprecated, renamed: "onPrint(_:)")
     public func setOutputHandler(_ handler: @escaping PrintOutputHandler) {
         self.printHandler = handler
     }
@@ -235,7 +245,21 @@ public final class LuaState {
         }
     }
 
-    public func executeReturning<T: LuaConvertible>(_ code: String, as type: T.Type = T.self) throws -> T {
+    /// Execute Lua code and return a typed result.
+    ///
+    /// - Parameters:
+    ///   - code: The Lua code to execute.
+    ///   - returning: The expected return type.
+    /// - Returns: The result converted to the specified type.
+    /// - Throws: `LuaError.syntax` if the code has syntax errors,
+    ///           `LuaError.runtime` if execution fails,
+    ///           `LuaError.typeMismatch` if the result cannot be converted.
+    ///
+    /// Example:
+    /// ```swift
+    /// let sum: Int = try lua.execute("return 10 + 20", returning: Int.self)
+    /// ```
+    public func execute<T: LuaConvertible>(_ code: String, returning type: T.Type) throws -> T {
         if luaL_loadstring(L, code) != LUA_OK {
             let error = getError()
             throw LuaError.syntax(error)
@@ -253,6 +277,11 @@ public final class LuaState {
 
         lua_settop(L, -2)
         return result
+    }
+
+    @available(*, deprecated, renamed: "execute(_:returning:)")
+    public func executeReturning<T: LuaConvertible>(_ code: String, as type: T.Type = T.self) throws -> T {
+        return try execute(code, returning: type)
     }
 
     private func getError() -> String {
@@ -278,8 +307,31 @@ public final class LuaState {
     }
 }
 
+/// A type that can be converted to and from Lua values.
+///
+/// This protocol is already implemented for common Swift types:
+/// - `Bool`, `Int`, `Double`, `String`
+/// - `[T]` where T: LuaConvertible
+/// - `[String: T]` where T: LuaConvertible
+/// - `Optional<T>` where T: LuaConvertible
+///
+/// Most users don't need to implement this protocol directly. Instead, use the
+/// `@LuaBridgeable` macro for custom classes and structs.
+///
+/// - Note: Advanced users implementing this protocol must `import Lua` to access
+///   the `OpaquePointer` type. This is the raw Lua state pointer.
 public protocol LuaConvertible {
+    /// Push a value onto the Lua stack.
+    /// - Parameters:
+    ///   - value: The value to push.
+    ///   - L: The raw Lua state pointer (requires `import Lua`).
     static func push(_ value: Self, to L: OpaquePointer)
+
+    /// Pull a value from the Lua stack.
+    /// - Parameters:
+    ///   - L: The raw Lua state pointer (requires `import Lua`).
+    ///   - index: The stack index.
+    /// - Returns: The converted value, or `nil` if conversion failed.
     static func pull(from L: OpaquePointer, at index: Int32) -> Self?
 }
 

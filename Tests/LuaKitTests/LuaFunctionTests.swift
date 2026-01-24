@@ -115,13 +115,58 @@ final class LuaFunctionTests: XCTestCase {
     }
 
     func testFourParameterFunction() {
-        // LuaFunction only supports up to 3 parameters
-        XCTSkip("LuaFunction only supports up to 3 parameters")
+        let function = LuaFunction { (a: Int, b: Int, c: Int, d: Int) -> Int in
+            return a + b + c + d
+        }
+
+        function.push(to: lua.luaState)
+        lua_pushinteger(lua.luaState, 10)
+        lua_pushinteger(lua.luaState, 20)
+        lua_pushinteger(lua.luaState, 30)
+        lua_pushinteger(lua.luaState, 40)
+        _ = lua_pcall(lua.luaState, 4, 1, 0)
+
+        let result = lua_tointeger(lua.luaState, -1)
+        XCTAssertEqual(result, 100)
+        lua_pop(lua.luaState, 1)
     }
 
     func testFiveParameterFunction() {
-        // LuaFunction only supports up to 3 parameters
-        XCTSkip("LuaFunction only supports up to 3 parameters")
+        let function = LuaFunction { (a: String, b: Int, c: Double, d: Bool, e: String) -> String in
+            return "\(a)-\(b)-\(c)-\(d)-\(e)"
+        }
+
+        function.push(to: lua.luaState)
+        lua_pushstring(lua.luaState, "test")
+        lua_pushinteger(lua.luaState, 42)
+        lua_pushnumber(lua.luaState, 3.14)
+        lua_pushboolean(lua.luaState, 1)
+        lua_pushstring(lua.luaState, "end")
+        _ = lua_pcall(lua.luaState, 5, 1, 0)
+
+        let result = String(cString: lua_tostring(lua.luaState, -1)!)
+        XCTAssertEqual(result, "test-42-3.14-true-end")
+        lua_pop(lua.luaState, 1)
+    }
+
+    func testSixParameterFunction() {
+        let function = LuaFunction { (a: Int, b: Int, c: Int, d: Int, e: Int, f: Int) -> Int in
+            return a * b * c + d * e * f
+        }
+
+        function.push(to: lua.luaState)
+        lua_pushinteger(lua.luaState, 2)
+        lua_pushinteger(lua.luaState, 3)
+        lua_pushinteger(lua.luaState, 4)
+        lua_pushinteger(lua.luaState, 5)
+        lua_pushinteger(lua.luaState, 6)
+        lua_pushinteger(lua.luaState, 7)
+        _ = lua_pcall(lua.luaState, 6, 1, 0)
+
+        let result = lua_tointeger(lua.luaState, -1)
+        // 2 * 3 * 4 + 5 * 6 * 7 = 24 + 210 = 234
+        XCTAssertEqual(result, 234)
+        lua_pop(lua.luaState, 1)
     }
 
     // MARK: - Different Type Tests
@@ -266,6 +311,33 @@ final class LuaFunctionTests: XCTestCase {
         XCTAssertEqual(lua.globals["sum"] as? Int, 30)
         XCTAssertEqual(lua.globals["text"] as? String, "Hello World")
         XCTAssertEqual(lua.globals["positive"] as? Bool, false)
+    }
+
+    func testRegisterFourParameterFunction() {
+        lua.registerFunction("sum4") { (a: Int, b: Int, c: Int, d: Int) -> Int in
+            return a + b + c + d
+        }
+
+        _ = try? lua.execute("result = sum4(1, 2, 3, 4)")
+        XCTAssertEqual(lua.globals["result"] as? Int, 10)
+    }
+
+    func testRegisterFiveParameterFunction() {
+        lua.registerFunction("format5") { (a: String, b: Int, c: Double, d: Bool, e: String) -> String in
+            return "\(a)|\(b)|\(c)|\(d)|\(e)"
+        }
+
+        _ = try? lua.execute("result = format5('hello', 42, 3.14, true, 'world')")
+        XCTAssertEqual(lua.globals["result"] as? String, "hello|42|3.14|true|world")
+    }
+
+    func testRegisterSixParameterFunction() {
+        lua.registerFunction("combine6") { (a: Int, b: Int, c: Int, d: Int, e: Int, f: Int) -> Int in
+            return a + b + c + d + e + f
+        }
+
+        _ = try? lua.execute("result = combine6(1, 2, 3, 4, 5, 6)")
+        XCTAssertEqual(lua.globals["result"] as? Int, 21)
     }
 
     func testFunctionReturningMultipleValues() {
