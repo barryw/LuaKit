@@ -1,0 +1,148 @@
+# Woodpecker CI Configuration for LuaKit
+# Runs on local macOS runner with Swift and cog installed
+
+when:
+  - event: [push, pull_request]
+    branch: [main, develop]
+
+variables:
+  - &macos_runner
+    labels:
+      platform: darwin
+      arch: arm64
+
+steps:
+  # Build and Test
+  build:
+    <<: *macos_runner
+    commands:
+      - echo "=== Building LuaKit ==="
+      - swift build --configuration release
+      - echo "=== Build Complete ==="
+
+  test:
+    <<: *macos_runner
+    depends_on: [build]
+    commands:
+      - echo "=== Running Tests ==="
+      - swift test --configuration release --parallel
+      - echo "=== Tests Complete ==="
+
+  # Lint
+  lint:
+    <<: *macos_runner
+    commands:
+      - echo "=== Running SwiftLint ==="
+      - swiftlint lint --quiet
+      - echo "=== Lint Complete ==="
+
+  # Security scan - check dependencies
+  security:
+    <<: *macos_runner
+    commands:
+      - echo "=== Security Scan ==="
+      - swift package show-dependencies --format json > dependencies.json
+      - echo "Dependencies exported to dependencies.json"
+      - echo "=== Security Scan Complete ==="
+
+  # Semantic version bump and release (only on main branch push)
+  release:
+    <<: *macos_runner
+    depends_on: [build, test, lint]
+    when:
+      - event: push
+        branch: main
+    commands:
+      - echo "=== Checking for Version Bump ==="
+
+      # Get the latest tag
+      - git fetch --tags
+      - LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0")
+      - echo "Latest tag: $LATEST_TAG"
+
+      # Check if there are conventional commits since last tag
+      - |
+        if cog check --from-latest-tag 2>/dev/null; then
+          echo "All commits are conventional"
+        else
+          echo "Warning: Some commits may not follow conventional commit format"
+        fi
+
+      # Determine version bump using cog
+      - |
+        echo "Determining version bump..."
+
+        # Get bump type from cog changelog
+        BUMP_TYPE=$(cog bump --dry-run 2>&1 | grep -oE "(major|minor|patch)" | head -1 || echo "")
+
+        if [ -z "$BUMP_TYPE" ]; then
+          echo "No version bump needed based on commits"
+          exit 0
+        fi
+
+        echo "Bump type: $BUMP_TYPE"
+
+        # Perform the bump
+        echo "Bumping version..."
+        cog bump --$BUMP_TYPE
+
+        # Get the new version (cog creates tag without lua suffix, post_bump_hooks fix it)
+        NEW_TAG=$(git describe --tags --abbrev=0)
+        echo "New version: $NEW_TAG"
+
+        # Push the tag
+        git push origin $NEW_TAG
+
+        # Generate changelog for release notes
+        RELEASE_NOTES=$(cog changelog --at $NEW_TAG 2>/dev/null || echo "Release $NEW_TAG")
+
+        # Create GitHub release
+        echo "Creating GitHub release..."
+        gh release create "$NEW_TAG" \
+          --title "LuaKit $NEW_TAG" \
+          --notes "$RELEASE_NOTES" \
+          --latest
+
+        echo "=== Release $NEW_TAG Created ==="
+
+  # Update version in logo and README (only after successful release)
+  update-version-assets:
+    <<: *macos_runner
+    depends_on: [release]
+    when:
+      - event: push
+        branch: main
+    commands:
+      - |
+        # Get the latest tag
+        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || exit 0)
+
+        # Extract version number (remove lua suffix if present)
+        VERSION=$(echo "$LATEST_TAG" | sed 's/+.*//')
+
+        if [ -z "$VERSION" ]; then
+          echo "No version found, skipping asset update"
+          exit 0
+        fi
+
+        echo "Updating assets to version $VERSION"
+
+        # Update the version in the logo SVG
+        sed -i '' "s/>v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*</>v${VERSION}</" Images/luakit-logo.svg
+
+        # Update the README cache-buster
+        CACHE_BUST=$(date +%Y%m%d%H%M)
+        sed -i '' "s/luakit-logo\.svg?r=[0-9]*/luakit-logo.svg?r=${CACHE_BUST}/" README.md
+
+        # Update installation version in README
+        sed -i '' "s/from: \"[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\"/from: \"${VERSION}\"/" README.md
+
+        # Check if any files were modified
+        if git diff --quiet Images/luakit-logo.svg README.md 2>/dev/null; then
+          echo "No changes to version assets"
+        else
+          git add Images/luakit-logo.svg README.md
+          git commit -m "chore: update logo version to v${VERSION}"
+          git push origin main
+          echo "Version assets updated"
+        fi
