@@ -1,0 +1,42 @@
+# Cocogitto configuration for LuaKit
+# https://docs.cocogitto.io/
+
+from_latest_tag = true
+ignore_merge_commits = true
+branch_whitelist = ["main"]
+tag_prefix = ""
+
+# Post-bump hooks to add Lua version suffix to tag
+# Must be at root level, before any [sections]
+post_bump_hooks = [
+    "sh -c 'LUA_VER=$(grep LUA_VERSION_MAJOR Sources/Lua/include/lua.h | head -1 | grep -o \"[0-9]\").$(grep LUA_VERSION_MINOR Sources/Lua/include/lua.h | head -1 | grep -o \"[0-9]\").$(grep LUA_VERSION_RELEASE Sources/Lua/include/lua.h | head -1 | grep -o \"[0-9]\") && git tag -d {{version}} && git tag -a {{version}}+lua${LUA_VER} -m \"LuaKit {{version}}+lua${LUA_VER}\"'",
+]
+
+[git_hooks.commit-msg]
+script = """#!/bin/sh
+set -e
+cog verify --file $1
+"""
+
+# Pre-push hook disabled due to tag format (x.x.x+luax.x.x) not being
+# recognized by cog's --from-latest-tag. The commit-msg hook still
+# enforces conventional commits for new commits.
+
+[commit_types]
+feat = { changelog_title = "Features" }
+fix = { changelog_title = "Bug Fixes" }
+docs = { changelog_title = "Documentation" }
+style = { changelog_title = "Style" }
+refactor = { changelog_title = "Refactoring" }
+perf = { changelog_title = "Performance" }
+test = { changelog_title = "Tests" }
+build = { changelog_title = "Build" }
+ci = { changelog_title = "CI/CD" }
+chore = { changelog_title = "Chores", omit_from_changelog = true }
+
+[changelog]
+path = "CHANGELOG.md"
+template = "remote"
+remote = "github.com"
+repository = "LuaKit"
+owner = "barryw"
