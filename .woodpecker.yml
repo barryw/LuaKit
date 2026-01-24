@@ -6,7 +6,7 @@ when:
     branch: [main, develop]
 
 labels:
-  backend: local
+  platform: darwin/arm64
 
 steps:
   - name: build
