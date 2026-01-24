@@ -1,6 +1,6 @@
 <div align="center">
 
-![LuaKit Logo](Images/luakit-logo.svg?v=1.6.1)
+![LuaKit Logo](Images/luakit-logo.svg?r=20260124)
 
 [![Swift](https://img.shields.io/badge/Swift-5.9+-orange.svg)](https://swift.org)
 [![Platforms](https://img.shields.io/badge/Platforms-iOS%2013%2B%20|%20macOS%2010.15%2B%20|%20tvOS%2013%2B%20|%20watchOS%206%2B-blue.svg)](https://swift.org)

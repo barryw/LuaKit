@@ -332,12 +332,13 @@ jobs:
         # Update the version in the logo SVG
         sed -i '' "s/>v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*</>v${VERSION}</" Images/luakit-logo.svg
 
-        # Update the README cache-buster to force GitHub to reload the logo
-        sed -i '' "s/luakit-logo\.svg?v=[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/luakit-logo.svg?v=${VERSION}/" README.md
+        # Update the README cache-buster with timestamp to force GitHub CDN refresh
+        CACHE_BUST=$(date +%Y%m%d%H%M)
+        sed -i '' "s/luakit-logo\.svg?r=[0-9]*/luakit-logo.svg?r=${CACHE_BUST}/" README.md
 
         # If no cache-buster exists, add one
-        if ! grep -q "luakit-logo.svg?v=" README.md; then
-          sed -i '' "s/luakit-logo\.svg)/luakit-logo.svg?v=${VERSION})/" README.md
+        if ! grep -q "luakit-logo.svg?r=" README.md; then
+          sed -i '' "s/luakit-logo\.svg)/luakit-logo.svg?r=${CACHE_BUST})/" README.md
         fi
 
         # Check if any files were modified
