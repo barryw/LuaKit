@@ -2,7 +2,7 @@
 
 ![LuaKit Logo](Images/luakit-logo.svg?r=202601240223)
 
-[![Swift](https://img.shields.io/badge/Swift-5.9+-orange.svg)](https://swift.org)
+[![Swift](https://img.shields.io/badge/Swift-6.2-orange.svg)](https://swift.org)
 [![Platforms](https://img.shields.io/badge/Platforms-iOS%2013%2B%20|%20macOS%2010.15%2B%20|%20tvOS%2013%2B%20|%20watchOS%206%2B-blue.svg)](https://swift.org)
 [![License](https://img.shields.io/badge/License-MIT-brightgreen.svg)](LICENSE)
 [![Latest Release](https://img.shields.io/github/v/release/barryw/LuaKit)](https://github.com/barryw/LuaKit/releases/latest)
@@ -104,9 +104,9 @@ LuaKit is perfect for:
 
 ## Requirements
 
-- Swift 5.9+
+- Swift 6.2+
 - iOS 13.0+ / macOS 10.15+ / tvOS 13.0+ / watchOS 6.0+
-- Xcode 15.0+
+- Xcode 16.0+
 
 ## Contributing
 
