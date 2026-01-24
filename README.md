@@ -1,6 +1,6 @@
 <div align="center">
 
-![LuaKit Logo](Images/luakit-logo.svg?r=202601240313)
+![LuaKit Logo](Images/luakit-logo.svg?r=202601241529)
 
 [![Swift](https://img.shields.io/badge/Swift-6.2-orange.svg)](https://swift.org)
 [![Platforms](https://img.shields.io/badge/Platforms-iOS%2013%2B%20|%20macOS%2010.15%2B%20|%20tvOS%2013%2B%20|%20watchOS%206%2B-blue.svg)](https://swift.org)
@@ -34,7 +34,7 @@ Add LuaKit to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/barryw/LuaKit", from: "1.7.2")
+    .package(url: "https://github.com/barryw/LuaKit", from: "1.7.3")
 ]
 ```
 
