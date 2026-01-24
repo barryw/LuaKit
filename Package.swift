@@ -57,11 +57,7 @@ let package = Package(
             name: "LuaKitTests",
             dependencies: ["LuaKit"],
             exclude: [
-                "EnhancementsTests.swift.disabled",
-                "LuaIgnoreTest.swift.disabled",
-                "PropertyChangeTests.swift.disabled",
-                "ArrayPropertyTests.swift.disabled",
-                "ArrayElementAccessTests.swift.disabled"
+                "EnhancementsTests.swift.disabled"
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
@@ -71,8 +67,7 @@ let package = Package(
             name: "LuaKitPublicAPITests",
             dependencies: ["LuaKit"],
             exclude: [
-                "README.md",
-                "ArrayProxyPublicAPITest.swift.disabled"
+                "README.md"
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6)

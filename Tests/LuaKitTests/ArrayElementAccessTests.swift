@@ -25,6 +25,21 @@ class ColorPalette: LuaBridgeable, CustomStringConvertible {
     }
 }
 
+// Moved out of function for Swift 6 compatibility
+@LuaBridgeable
+class DataArrays: LuaBridgeable {
+    var strings: [String] = []
+    var integers: [Int] = []
+    var doubles: [Double] = []
+    var booleans: [Bool] = []
+
+    init() {}
+
+    var description: String {
+        return "DataArrays(strings: \(strings.count), integers: \(integers.count), doubles: \(doubles.count), booleans: \(booleans.count))"
+    }
+}
+
 class ArrayElementAccessTests: XCTestCase {
     func testArrayElementAccess() throws {
         let lua = try LuaState()
@@ -109,22 +124,6 @@ class ArrayElementAccessTests: XCTestCase {
 
     func testAllArrayTypes() throws {
         let lua = try LuaState()
-
-        // Test with a class that has all array types
-        @LuaBridgeable
-        class DataArrays: LuaBridgeable {
-            var strings: [String] = []
-            var integers: [Int] = []
-            var doubles: [Double] = []
-            var booleans: [Bool] = []
-
-            init() {}
-
-            var description: String {
-                return "DataArrays(strings: \(strings.count), integers: \(integers.count), doubles: \(doubles.count), booleans: \(booleans.count))"
-            }
-        }
-
         lua.register(DataArrays.self, as: "DataArrays")
 
         let output = try lua.execute("""

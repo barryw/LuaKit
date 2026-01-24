@@ -71,6 +71,80 @@ public final class LuaFunction: @unchecked Sendable {
         }
     }
 
+    /// Creates a Lua function from a Swift closure with four parameters
+    public init<T1, T2, T3, T4, R>(_ closure: @escaping (T1, T2, T3, T4) -> R)
+    where T1: LuaConvertible, T2: LuaConvertible, T3: LuaConvertible, T4: LuaConvertible {
+        self.id = Self.storage.registerClosure { L in
+            guard let arg1 = T1.pull(from: L, at: 1) else {
+                return luaError(L, "Expected \(T1.self) for argument 1")
+            }
+            guard let arg2 = T2.pull(from: L, at: 2) else {
+                return luaError(L, "Expected \(T2.self) for argument 2")
+            }
+            guard let arg3 = T3.pull(from: L, at: 3) else {
+                return luaError(L, "Expected \(T3.self) for argument 3")
+            }
+            guard let arg4 = T4.pull(from: L, at: 4) else {
+                return luaError(L, "Expected \(T4.self) for argument 4")
+            }
+            let result = closure(arg1, arg2, arg3, arg4)
+            return LuaFunction.pushResult(result, to: L)
+        }
+    }
+
+    /// Creates a Lua function from a Swift closure with five parameters
+    public init<T1, T2, T3, T4, T5, R>(_ closure: @escaping (T1, T2, T3, T4, T5) -> R)
+    where T1: LuaConvertible, T2: LuaConvertible, T3: LuaConvertible, T4: LuaConvertible,
+          T5: LuaConvertible {
+        self.id = Self.storage.registerClosure { L in
+            guard let arg1 = T1.pull(from: L, at: 1) else {
+                return luaError(L, "Expected \(T1.self) for argument 1")
+            }
+            guard let arg2 = T2.pull(from: L, at: 2) else {
+                return luaError(L, "Expected \(T2.self) for argument 2")
+            }
+            guard let arg3 = T3.pull(from: L, at: 3) else {
+                return luaError(L, "Expected \(T3.self) for argument 3")
+            }
+            guard let arg4 = T4.pull(from: L, at: 4) else {
+                return luaError(L, "Expected \(T4.self) for argument 4")
+            }
+            guard let arg5 = T5.pull(from: L, at: 5) else {
+                return luaError(L, "Expected \(T5.self) for argument 5")
+            }
+            let result = closure(arg1, arg2, arg3, arg4, arg5)
+            return LuaFunction.pushResult(result, to: L)
+        }
+    }
+
+    /// Creates a Lua function from a Swift closure with six parameters
+    public init<T1, T2, T3, T4, T5, T6, R>(_ closure: @escaping (T1, T2, T3, T4, T5, T6) -> R)
+    where T1: LuaConvertible, T2: LuaConvertible, T3: LuaConvertible, T4: LuaConvertible,
+          T5: LuaConvertible, T6: LuaConvertible {
+        self.id = Self.storage.registerClosure { L in
+            guard let arg1 = T1.pull(from: L, at: 1) else {
+                return luaError(L, "Expected \(T1.self) for argument 1")
+            }
+            guard let arg2 = T2.pull(from: L, at: 2) else {
+                return luaError(L, "Expected \(T2.self) for argument 2")
+            }
+            guard let arg3 = T3.pull(from: L, at: 3) else {
+                return luaError(L, "Expected \(T3.self) for argument 3")
+            }
+            guard let arg4 = T4.pull(from: L, at: 4) else {
+                return luaError(L, "Expected \(T4.self) for argument 4")
+            }
+            guard let arg5 = T5.pull(from: L, at: 5) else {
+                return luaError(L, "Expected \(T5.self) for argument 5")
+            }
+            guard let arg6 = T6.pull(from: L, at: 6) else {
+                return luaError(L, "Expected \(T6.self) for argument 6")
+            }
+            let result = closure(arg1, arg2, arg3, arg4, arg5, arg6)
+            return LuaFunction.pushResult(result, to: L)
+        }
+    }
+
     deinit {
         Self.storage.removeAll(id: self.id)
     }
@@ -333,6 +407,38 @@ public extension LuaState {
     /// Registers a Swift closure with three parameters as a global Lua function
     func registerFunction<T1, T2, T3, R>(_ name: String, _ closure: @escaping (T1, T2, T3) -> R)
     where T1: LuaConvertible, T2: LuaConvertible, T3: LuaConvertible {
+        let function = LuaFunction(closure)
+        function.push(to: luaState)
+        lua_setglobal(luaState, name)
+    }
+
+    /// Registers a Swift closure with four parameters as a global Lua function
+    func registerFunction<T1, T2, T3, T4, R>(_ name: String, _ closure: @escaping (T1, T2, T3, T4) -> R)
+    where T1: LuaConvertible, T2: LuaConvertible, T3: LuaConvertible, T4: LuaConvertible {
+        let function = LuaFunction(closure)
+        function.push(to: luaState)
+        lua_setglobal(luaState, name)
+    }
+
+    /// Registers a Swift closure with five parameters as a global Lua function
+    func registerFunction<T1, T2, T3, T4, T5, R>(
+        _ name: String,
+        _ closure: @escaping (T1, T2, T3, T4, T5) -> R
+    )
+    where T1: LuaConvertible, T2: LuaConvertible, T3: LuaConvertible, T4: LuaConvertible,
+          T5: LuaConvertible {
+        let function = LuaFunction(closure)
+        function.push(to: luaState)
+        lua_setglobal(luaState, name)
+    }
+
+    /// Registers a Swift closure with six parameters as a global Lua function
+    func registerFunction<T1, T2, T3, T4, T5, T6, R>(
+        _ name: String,
+        _ closure: @escaping (T1, T2, T3, T4, T5, T6) -> R
+    )
+    where T1: LuaConvertible, T2: LuaConvertible, T3: LuaConvertible, T4: LuaConvertible,
+          T5: LuaConvertible, T6: LuaConvertible {
         let function = LuaFunction(closure)
         function.push(to: luaState)
         lua_setglobal(luaState, name)
