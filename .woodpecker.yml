@@ -15,17 +15,12 @@ clone:
       lfs: false
 
 steps:
-  - name: build
+  - name: build-and-test
     image: bash
     commands:
       - echo "=== Building LuaKit ==="
       - swift build --configuration release
       - echo "=== Build Complete ==="
-
-  - name: test
-    image: bash
-    depends_on: [build]
-    commands:
       - echo "=== Running Tests ==="
       - gtimeout 600 swift test --configuration release || { echo "Tests timed out or failed"; exit 1; }
       - echo "=== Tests Complete ==="
@@ -46,7 +41,7 @@ steps:
 
   - name: release
     image: bash
-    depends_on: [build, test, lint]
+    depends_on: [build-and-test, lint]
     when:
       - event: push
         branch: main
