@@ -27,7 +27,7 @@ steps:
     depends_on: [build]
     commands:
       - echo "=== Running Tests ==="
-      - swift test --configuration release --parallel
+      - gtimeout 600 swift test --configuration release --parallel || { echo "Tests timed out or failed"; exit 1; }
       - echo "=== Tests Complete ==="
 
   - name: lint
