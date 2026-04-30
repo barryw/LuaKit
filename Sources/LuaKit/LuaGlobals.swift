@@ -24,14 +24,18 @@ extension LuaState {
 
     /// Convert a Swift object to a Lua reference
     public func toReference<T: LuaBridgeable>(_ object: T) -> LuaReference {
-        return LuaReference(object: object, luaState: self)
+        withLuaLock {
+            return LuaReference(object: object, luaState: self)
+        }
     }
 
     /// Create a Lua table
     public func createTable(arrayCount: Int = 0, dictCount: Int = 0) -> LuaTable {
-        lua_createtable(luaState, Int32(arrayCount), Int32(dictCount))
-        let ref = luaL_ref(luaState, luaRegistryIndex)
-        return LuaTable(reference: ref, luaState: self)
+        withLuaLock {
+            lua_createtable(luaState, Int32(arrayCount), Int32(dictCount))
+            let ref = luaL_ref(luaState, luaRegistryIndex)
+            return LuaTable(reference: ref, luaState: self)
+        }
     }
 }
 
@@ -45,35 +49,43 @@ public struct LuaGlobals {
 
     public subscript(name: String) -> Any? {
         get {
-            let L = luaState.luaState
-            lua_getglobal(L, name)
-            defer { lua_settop(L, -2) } // pop the value
+            luaState.withLuaLock {
+                let L = luaState.luaState
+                lua_getglobal(L, name)
+                defer { lua_settop(L, -2) } // pop the value
 
-            return extractValue(from: L, at: -1)
+                return extractValue(from: L, at: -1)
+            }
         }
         set {
-            let L = luaState.luaState
+            luaState.withLuaLock {
+                let L = luaState.luaState
 
-            if let value = newValue {
-                pushValue(value, to: L)
-            } else {
-                lua_pushnil(L)
+                if let value = newValue {
+                    pushValue(value, to: L)
+                } else {
+                    lua_pushnil(L)
+                }
+
+                lua_setglobal(L, name)
             }
-
-            lua_setglobal(L, name)
         }
     }
 
     /// Set a global variable with a LuaReference
     public func set(_ name: String, to reference: LuaReference) {
-        reference.push()
-        lua_setglobal(luaState.luaState, name)
+        luaState.withLuaLock {
+            reference.push()
+            lua_setglobal(luaState.luaState, name)
+        }
     }
 
     /// Set a global variable with a LuaTable
     public func set(_ name: String, to table: LuaTable) {
-        table.push()
-        lua_setglobal(luaState.luaState, name)
+        luaState.withLuaLock {
+            table.push()
+            lua_setglobal(luaState.luaState, name)
+        }
     }
 
     private func pushValue(_ value: Any, to L: OpaquePointer) {
@@ -85,7 +97,7 @@ public struct LuaGlobals {
         case let double as Double:
             lua_pushnumber(L, double)
         case let string as String:
-            lua_pushstring(L, string)
+            luaPushString(L, string)
         case let function as LuaFunction:
             function.push(to: L)
         case let bridgeable as LuaBridgeable:
@@ -133,7 +145,7 @@ public struct LuaGlobals {
     private func pushDictionary(_ dict: [String: Any], to L: OpaquePointer) {
         lua_createtable(L, 0, Int32(dict.count))
         for (key, value) in dict {
-            lua_pushstring(L, key)
+            luaPushString(L, key)
             pushValue(value, to: L)
             lua_settable(L, -3)
         }
@@ -158,9 +170,7 @@ public struct LuaGlobals {
                 return lua_tonumberx(L, index, nil)
             }
         case LUA_TSTRING:
-            if let cStr = lua_tolstring(L, index, nil) {
-                return String(cString: cStr)
-            }
+            return luaString(L, at: index)
         case LUA_TTABLE:
             return extractTable(from: L, at: index)
         case LUA_TUSERDATA:
@@ -194,9 +204,10 @@ public struct LuaGlobals {
         var dict: [String: Any] = [:]
         lua_pushnil(L)
         while lua_next(L, tableIndex) != 0 {
-            if let key = lua_tolstring(L, -2, nil),
+            if lua_type(L, -2) == LUA_TSTRING,
+               let key = luaString(L, at: -2),
                let value = extractValue(from: L, at: -1) {
-                dict[String(cString: key)] = value
+                dict[key] = value
             }
             lua_pop(L, 1)
         }
@@ -217,22 +228,29 @@ public class LuaReference {
     }
 
     init<T: LuaBridgeable>(object: T, luaState: LuaState) {
-        let L = luaState.luaState
-        type(of: object).push(object, to: L)
-        self.reference = luaL_ref(L, luaRegistryIndex)
+        let reference = luaState.withLuaLock {
+            let L = luaState.luaState
+            type(of: object).push(object, to: L)
+            return luaL_ref(L, luaRegistryIndex)
+        }
+        self.reference = reference
         self.luaState = luaState
     }
 
     deinit {
         // Clean up the reference when deallocated
         if let luaState = luaState {
-            luaL_unref(luaState.luaState, luaRegistryIndex, reference)
+            luaState.withLuaLock {
+                luaL_unref(luaState.luaState, luaRegistryIndex, reference)
+            }
         }
     }
 
     func push() {
         guard let luaState = luaState else { return }
-        lua_rawgeti(luaState.luaState, luaRegistryIndex, lua_Integer(reference))
+        luaState.withLuaLock {
+            lua_rawgeti(luaState.luaState, luaRegistryIndex, lua_Integer(reference))
+        }
     }
 }
 
@@ -251,13 +269,17 @@ public class LuaTable {
     deinit {
         // Clean up the reference when deallocated
         if let luaState = luaState {
-            luaL_unref(luaState.luaState, luaRegistryIndex, reference)
+            luaState.withLuaLock {
+                luaL_unref(luaState.luaState, luaRegistryIndex, reference)
+            }
         }
     }
 
     func push() {
         guard let luaState = luaState else { return }
-        lua_rawgeti(luaState.luaState, luaRegistryIndex, lua_Integer(reference))
+        luaState.withLuaLock {
+            lua_rawgeti(luaState.luaState, luaRegistryIndex, lua_Integer(reference))
+        }
     }
 
     /// Internal accessor for the Lua state (used by extensions in other files)
@@ -268,39 +290,45 @@ public class LuaTable {
     /// Internal accessor to push and get the Lua pointer
     func withLuaState<R>(_ body: (OpaquePointer) throws -> R) rethrows -> R? {
         guard let luaState = luaState else { return nil }
-        let L = luaState.luaState
-        push()
-        defer { lua_pop(L, 1) }
-        return try body(L)
+        return try luaState.withLuaLock {
+            let L = luaState.luaState
+            push()
+            defer { lua_pop(L, 1) }
+            return try body(L)
+        }
     }
 
     /// Array-style access (1-indexed like Lua)
     public subscript(index: Int) -> Any? {
         get {
             guard let luaState = luaState else { return nil }
-            let L = luaState.luaState
+            return luaState.withLuaLock {
+                let L = luaState.luaState
 
-            push() // Push table
-            lua_rawgeti(L, -1, lua_Integer(index))
-            let value = extractValue(from: L, at: -1)
-            lua_settop(L, -3) // Pop value and table
+                push() // Push table
+                lua_rawgeti(L, -1, lua_Integer(index))
+                let value = extractValue(from: L, at: -1)
+                lua_settop(L, -3) // Pop value and table
 
-            return value
+                return value
+            }
         }
         set {
             guard let luaState = luaState else { return }
-            let L = luaState.luaState
+            luaState.withLuaLock {
+                let L = luaState.luaState
 
-            push() // Push table
+                push() // Push table
 
-            if let value = newValue {
-                pushValue(value, to: L)
-            } else {
-                lua_pushnil(L)
+                if let value = newValue {
+                    pushValue(value, to: L)
+                } else {
+                    lua_pushnil(L)
+                }
+
+                lua_rawseti(L, -2, lua_Integer(index))
+                lua_settop(L, -2) // Pop table
             }
-
-            lua_rawseti(L, -2, lua_Integer(index))
-            lua_settop(L, -2) // Pop table
         }
     }
 
@@ -308,29 +336,33 @@ public class LuaTable {
     public subscript(key: String) -> Any? {
         get {
             guard let luaState = luaState else { return nil }
-            let L = luaState.luaState
+            return luaState.withLuaLock {
+                let L = luaState.luaState
 
-            push() // Push table
-            lua_getfield(L, -1, key)
-            let value = extractValue(from: L, at: -1)
-            lua_settop(L, -3) // Pop value and table
+                push() // Push table
+                lua_getfield(L, -1, key)
+                let value = extractValue(from: L, at: -1)
+                lua_settop(L, -3) // Pop value and table
 
-            return value
+                return value
+            }
         }
         set {
             guard let luaState = luaState else { return }
-            let L = luaState.luaState
+            luaState.withLuaLock {
+                let L = luaState.luaState
 
-            push() // Push table
+                push() // Push table
 
-            if let value = newValue {
-                pushValue(value, to: L)
-            } else {
-                lua_pushnil(L)
+                if let value = newValue {
+                    pushValue(value, to: L)
+                } else {
+                    lua_pushnil(L)
+                }
+
+                lua_setfield(L, -2, key)
+                lua_settop(L, -2) // Pop table
             }
-
-            lua_setfield(L, -2, key)
-            lua_settop(L, -2) // Pop table
         }
     }
 
@@ -343,7 +375,7 @@ public class LuaTable {
         case let double as Double:
             lua_pushnumber(L, double)
         case let string as String:
-            lua_pushstring(L, string)
+            luaPushString(L, string)
         case let function as LuaFunction:
             function.push(to: L)
         case let bridgeable as LuaBridgeable:
@@ -390,7 +422,7 @@ public class LuaTable {
     private func pushDictionary(_ dict: [String: Any], to L: OpaquePointer) {
         lua_createtable(L, 0, Int32(dict.count))
         for (key, value) in dict {
-            lua_pushstring(L, key)
+            luaPushString(L, key)
             pushValue(value, to: L)
             lua_settable(L, -3)
         }
@@ -415,9 +447,7 @@ public class LuaTable {
                 return lua_tonumberx(L, index, nil)
             }
         case LUA_TSTRING:
-            if let cStr = lua_tolstring(L, index, nil) {
-                return String(cString: cStr)
-            }
+            return luaString(L, at: index)
         case LUA_TTABLE:
             return extractTable(from: L, at: index)
         default:
@@ -448,9 +478,10 @@ public class LuaTable {
         var dict: [String: Any] = [:]
         lua_pushnil(L)
         while lua_next(L, tableIndex) != 0 {
-            if let key = lua_tolstring(L, -2, nil),
+            if lua_type(L, -2) == LUA_TSTRING,
+               let key = luaString(L, at: -2),
                let value = extractValue(from: L, at: -1) {
-                dict[String(cString: key)] = value
+                dict[key] = value
             }
             lua_pop(L, 1)
         }
@@ -463,49 +494,38 @@ public class LuaTable {
 extension LuaTable: Sequence {
     /// An iterator for LuaTable that yields (key, value) pairs
     public struct Iterator: IteratorProtocol {
-        private weak var luaState: LuaState?
-        private let reference: Int32
-        private var hasStarted: Bool = false
-        private var isExhausted: Bool = false
+        private let entries: [(key: LuaValue, value: LuaValue)]
+        private var index: Int = 0
 
         init(table: LuaTable) {
-            self.luaState = table.luaState
-            self.reference = table.reference
+            guard let luaState = table.luaState else {
+                self.entries = []
+                return
+            }
+
+            self.entries = luaState.withLuaLock {
+                let L = luaState.luaState
+                lua_rawgeti(L, luaRegistryIndex, lua_Integer(table.reference))
+                let tableIndex = lua_gettop(L)
+
+                var entries: [(key: LuaValue, value: LuaValue)] = []
+                lua_pushnil(L)
+                while lua_next(L, tableIndex) != 0 {
+                    if let key = LuaValue.pull(from: L, at: -2),
+                       let value = LuaValue.pull(from: L, at: -1) {
+                        entries.append((key: key, value: value))
+                    }
+                    lua_pop(L, 1)
+                }
+                lua_pop(L, 1)
+                return entries
+            }
         }
 
         public mutating func next() -> (key: LuaValue, value: LuaValue)? {
-            guard let luaState = luaState, !isExhausted else { return nil }
-            let L = luaState.luaState
-
-            // Push table
-            lua_rawgeti(L, luaRegistryIndex, lua_Integer(reference))
-            let tableIndex = lua_gettop(L)
-
-            if !hasStarted {
-                // First iteration: push nil as initial key
-                lua_pushnil(L)
-                hasStarted = true
-            } else {
-                // Subsequent iterations: push nil (key was consumed)
-                lua_pushnil(L)
-            }
-
-            if lua_next(L, tableIndex) != 0 {
-                // Stack now has: table, key, value
-                let value = LuaValue.pull(from: L, at: -1) ?? .nil
-                let key = LuaValue.pull(from: L, at: -2) ?? .nil
-
-                // Pop value and key, leave table for cleanup
-                lua_pop(L, 2)
-                lua_pop(L, 1) // Pop table
-
-                return (key: key, value: value)
-            } else {
-                // Iteration complete
-                isExhausted = true
-                lua_pop(L, 1) // Pop table
-                return nil
-            }
+            guard index < entries.count else { return nil }
+            defer { index += 1 }
+            return entries[index]
         }
     }
 
@@ -513,87 +533,87 @@ extension LuaTable: Sequence {
         return Iterator(table: self)
     }
 
-    /// The number of elements in the table (using rawlen for array-like tables)
+    /// The number of key-value pairs in the table.
     public var count: Int {
         guard let luaState = luaState else { return 0 }
-        let L = luaState.luaState
+        return luaState.withLuaLock {
+            let L = luaState.luaState
 
-        push()
-        let len = Int(lua_rawlen(L, -1))
-        lua_pop(L, 1)
-
-        // If rawlen returns 0, count manually using iteration
-        if len == 0 {
-            var count = 0
             push()
+            let tableIndex = lua_gettop(L)
+            var count = 0
             lua_pushnil(L)
-            while lua_next(L, -2) != 0 {
+            while lua_next(L, tableIndex) != 0 {
                 count += 1
-                lua_pop(L, 1) // Pop value, keep key
+                lua_pop(L, 1)
             }
-            lua_pop(L, 1) // Pop table
+            lua_pop(L, 1)
             return count
         }
-
-        return len
     }
 
     /// All keys in the table
     public var keys: [LuaValue] {
         guard let luaState = luaState else { return [] }
-        let L = luaState.luaState
-        var result: [LuaValue] = []
+        return luaState.withLuaLock {
+            let L = luaState.luaState
+            var result: [LuaValue] = []
 
-        push()
-        let tableIndex = lua_gettop(L)
-        lua_pushnil(L)
+            push()
+            let tableIndex = lua_gettop(L)
+            lua_pushnil(L)
 
-        while lua_next(L, tableIndex) != 0 {
-            if let key = LuaValue.pull(from: L, at: -2) {
-                result.append(key)
+            while lua_next(L, tableIndex) != 0 {
+                if let key = LuaValue.pull(from: L, at: -2) {
+                    result.append(key)
+                }
+                lua_pop(L, 1) // Pop value, keep key
             }
-            lua_pop(L, 1) // Pop value, keep key
-        }
 
-        lua_pop(L, 1) // Pop table
-        return result
+            lua_pop(L, 1) // Pop table
+            return result
+        }
     }
 
     /// All values in the table
     public var values: [LuaValue] {
         guard let luaState = luaState else { return [] }
-        let L = luaState.luaState
-        var result: [LuaValue] = []
+        return luaState.withLuaLock {
+            let L = luaState.luaState
+            var result: [LuaValue] = []
 
-        push()
-        let tableIndex = lua_gettop(L)
-        lua_pushnil(L)
+            push()
+            let tableIndex = lua_gettop(L)
+            lua_pushnil(L)
 
-        while lua_next(L, tableIndex) != 0 {
-            if let value = LuaValue.pull(from: L, at: -1) {
-                result.append(value)
+            while lua_next(L, tableIndex) != 0 {
+                if let value = LuaValue.pull(from: L, at: -1) {
+                    result.append(value)
+                }
+                lua_pop(L, 1) // Pop value, keep key
             }
-            lua_pop(L, 1) // Pop value, keep key
-        }
 
-        lua_pop(L, 1) // Pop table
-        return result
+            lua_pop(L, 1) // Pop table
+            return result
+        }
     }
 
     /// Check if the table is empty
     public var isEmpty: Bool {
         guard let luaState = luaState else { return true }
-        let L = luaState.luaState
+        return luaState.withLuaLock {
+            let L = luaState.luaState
 
-        push()
-        lua_pushnil(L)
-        let hasNext = lua_next(L, -2) != 0
-        if hasNext {
-            lua_pop(L, 2) // Pop key and value
+            push()
+            lua_pushnil(L)
+            let hasNext = lua_next(L, -2) != 0
+            if hasNext {
+                lua_pop(L, 2) // Pop key and value
+            }
+            lua_pop(L, 1) // Pop table
+
+            return !hasNext
         }
-        lua_pop(L, 1) // Pop table
-
-        return !hasNext
     }
 
     /// Check if the table contains a specific key
@@ -612,12 +632,14 @@ extension LuaTable: Sequence {
 public extension LuaState {
     /// Gets a LuaTable reference to a global table
     func getTable(_ name: String) -> LuaTable? {
-        lua_getglobal(luaState, name)
-        guard lua_type(luaState, -1) == LUA_TTABLE else {
-            lua_pop(luaState, 1)
-            return nil
+        withLuaLock {
+            lua_getglobal(luaState, name)
+            guard lua_type(luaState, -1) == LUA_TTABLE else {
+                lua_pop(luaState, 1)
+                return nil
+            }
+            let ref = luaL_ref(luaState, luaRegistryIndex)
+            return LuaTable(reference: ref, luaState: self)
         }
-        let ref = luaL_ref(luaState, luaRegistryIndex)
-        return LuaTable(reference: ref, luaState: self)
     }
 }

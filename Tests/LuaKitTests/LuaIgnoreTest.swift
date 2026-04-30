@@ -38,7 +38,7 @@ final class LuaIgnoreTest: XCTestCase {
         lua.register(TestIgnoreClass.self, as: "TestIgnoreClass")
 
         var output = ""
-        lua.setPrintHandler { text in
+        lua.onPrint { text in
             output += text
         }
 

@@ -25,16 +25,16 @@ final class TableTests: XCTestCase {
         lua.globals.set("person", to: table)
 
         // Verify from Lua
-        let name = try lua.executeReturning("return person.name", as: String.self)
+        let name = try lua.execute("return person.name", returning: String.self)
         XCTAssertEqual(name, "John")
 
-        let age = try lua.executeReturning("return person.age", as: Int.self)
+        let age = try lua.execute("return person.age", returning: Int.self)
         XCTAssertEqual(age, 30)
 
-        let first = try lua.executeReturning("return person[1]", as: String.self)
+        let first = try lua.execute("return person[1]", returning: String.self)
         XCTAssertEqual(first, "first")
 
-        let second = try lua.executeReturning("return person[2]", as: String.self)
+        let second = try lua.execute("return person[2]", returning: String.self)
         XCTAssertEqual(second, "second")
     }
 
@@ -77,7 +77,7 @@ final class TableTests: XCTestCase {
 
         // Iterate in Lua
         var output = ""
-        lua.setPrintHandler { text in
+        lua.onPrint { text in
             output += text
         }
 

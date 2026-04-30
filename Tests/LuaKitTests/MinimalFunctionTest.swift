@@ -24,7 +24,7 @@ final class MinimalFunctionTest: XCTestCase {
         print("Global set")
 
         print("Executing Lua code...")
-        let result = try lua.executeReturning("return test()", as: Int.self)
+        let result = try lua.execute("return test()", returning: Int.self)
         print("Result: \(result)")
 
         XCTAssertEqual(result, 42)

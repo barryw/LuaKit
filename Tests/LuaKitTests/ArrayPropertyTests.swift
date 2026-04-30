@@ -98,9 +98,9 @@ class ArrayPropertyTests: XCTestCase {
         XCTAssertEqual(config.servers[2], "server3.com")
 
         // Read array from Lua
-        let result = try lua.executeReturning("""
+        let result = try lua.execute("""
             return config.servers[2]  -- Lua uses 1-based indexing
-        """, as: String.self)
+        """, returning: String.self)
 
         XCTAssertEqual(result, "server2.com")
     }
@@ -149,13 +149,13 @@ class ArrayPropertyTests: XCTestCase {
         XCTAssertEqual(config.weights[2], 0.6, accuracy: 0.001)
 
         // Calculate sum in Lua
-        let sum = try lua.executeReturning("""
+        let sum = try lua.execute("""
             local sum = 0
             for i, w in ipairs(config.weights) do
                 sum = sum + w
             end
             return sum
-        """, as: Double.self)
+        """, returning: Double.self)
 
         XCTAssertEqual(sum, 1.0, accuracy: 0.001)
     }
@@ -175,13 +175,13 @@ class ArrayPropertyTests: XCTestCase {
         XCTAssertEqual(config.enabledFeatures, [true, false, true, true])
 
         // Count enabled features
-        let enabledCount = try lua.executeReturning("""
+        let enabledCount = try lua.execute("""
             local count = 0
             for _, enabled in ipairs(config.enabledFeatures) do
                 if enabled then count = count + 1 end
             end
             return count
-        """, as: Int.self)
+        """, returning: Int.self)
 
         XCTAssertEqual(enabledCount, 3)
     }
@@ -309,9 +309,9 @@ class ArrayPropertyTests: XCTestCase {
         lua.globals["config"] = config
 
         // Read arrays in Lua
-        let serverCount = try lua.executeReturning("""
+        let serverCount = try lua.execute("""
             return #config.servers
-        """, as: Int.self)
+        """, returning: Int.self)
 
         XCTAssertEqual(serverCount, 3)
 

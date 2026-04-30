@@ -68,10 +68,10 @@ public extension LuaTable {
         lua_pushnil(L)
         while lua_next(L, tableIndex) != 0 {
             // Get key as string (only support string keys for JSON)
-            if let key = lua_tolstring(L, -2, nil) {
-                if let value = extractAny(from: L, at: -1) {
-                    dict[String(cString: key)] = value
-                }
+            if lua_type(L, -2) == LUA_TSTRING,
+               let key = luaString(L, at: -2),
+               let value = extractAny(from: L, at: -1) {
+                dict[key] = value
             } else if lua_type(L, -2) == LUA_TNUMBER {
                 // Integer key - convert to string for JSON
                 let keyNum = lua_tointegerx(L, -2, nil)
@@ -98,9 +98,7 @@ public extension LuaTable {
                 return lua_tonumberx(L, index, nil)
             }
         case LUA_TSTRING:
-            if let cStr = lua_tolstring(L, index, nil) {
-                return String(cString: cStr)
-            }
+            return luaString(L, at: index)
         case LUA_TTABLE:
             // Check if array or dictionary
             let len = Int(lua_rawlen(L, index))
@@ -208,7 +206,7 @@ public extension LuaState {
         case let float as Float:
             lua_pushnumber(L, Double(float))
         case let string as String:
-            lua_pushstring(L, string)
+            luaPushString(L, string)
         case let array as [Any]:
             pushArray(array, to: L)
         case let dict as [String: Any]:
@@ -217,7 +215,7 @@ public extension LuaState {
             lua_pushnil(L)
         default:
             // Try to convert to string
-            lua_pushstring(L, String(describing: value))
+            luaPushString(L, String(describing: value))
         }
     }
 
@@ -232,7 +230,7 @@ public extension LuaState {
     private func pushDictionary(_ dict: [String: Any], to L: OpaquePointer) {
         lua_createtable(L, 0, Int32(dict.count))
         for (key, value) in dict {
-            lua_pushstring(L, key)
+            luaPushString(L, key)
             pushAny(value, to: L)
             lua_settable(L, -3)
         }

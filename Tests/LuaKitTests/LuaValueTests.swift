@@ -434,9 +434,21 @@ final class LuaValueTests: XCTestCase {
         lua_pop(L, 1)
     }
 
-    func testTableWithNonStringKeys() {
-        // Skip this test as it causes Lua API panic
-        XCTSkip("Test causes Lua API panic with 'invalid key to next'")
+    func testTableWithNonStringKeys() throws {
+        lua_createtable(L, 0, 2)
+
+        lua_pushinteger(L, 1)
+        luaPushString(L, "numeric key")
+        lua_settable(L, -3)
+
+        luaPushString(L, "name")
+        luaPushString(L, "string key")
+        lua_settable(L, -3)
+
+        let pulled = LuaValue.pull(from: L, at: -1)
+
+        XCTAssertEqual(pulled, .table(["name": .string("string key")]))
+        lua_pop(L, 1)
     }
 
     func testComplexTableIteration() {

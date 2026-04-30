@@ -16,6 +16,7 @@ final class LuaGlobalsAdvancedTests: XCTestCase {
         super.setUp()
         do {
             lua = try LuaState()
+            TestGlobalsBridgeable.register(in: lua, as: "TestBridgeable")
         } catch {
             XCTFail("Failed to create LuaState: \(error)")
         }
@@ -35,7 +36,7 @@ final class LuaGlobalsAdvancedTests: XCTestCase {
 
         lua.globals["myAdd"] = function
 
-        let result = try? lua.execute("""
+        _ = try? lua.execute("""
             return myAdd(10, 20)
         """)
 
@@ -43,7 +44,7 @@ final class LuaGlobalsAdvancedTests: XCTestCase {
         XCTAssertNotNil(lua.globals["myAdd"])
 
         // Execute and verify
-        let sum = try? lua.executeReturning("return myAdd(5, 7)", as: Int.self)
+        let sum = try? lua.execute("return myAdd(5, 7)", returning: Int.self)
         XCTAssertEqual(sum, 12)
     }
 
@@ -69,7 +70,7 @@ final class LuaGlobalsAdvancedTests: XCTestCase {
         XCTAssertNil(lua.globals["temp"])
 
         // Verify it's actually removed
-        let exists = try? lua.executeReturning("return temp ~= nil", as: Bool.self)
+        let exists = try? lua.execute("return temp ~= nil", returning: Bool.self)
         XCTAssertEqual(exists, false)
     }
 
@@ -98,9 +99,14 @@ final class LuaGlobalsAdvancedTests: XCTestCase {
         XCTAssertNil(userdataValue) // Userdata returns nil
     }
 
-    func testGlobalsSetWithLuaReference() {
-        // Skip - requires LuaBridgeable conformance
-        XCTSkip("Requires LuaBridgeable conforming type")
+    func testGlobalsSetWithLuaReference() throws {
+        let object = TestGlobalsBridgeable()
+        let reference = lua.toReference(object)
+
+        lua.globals.set("refObject", to: reference)
+
+        let type = try lua.execute("return type(refObject)", returning: String.self)
+        XCTAssertEqual(type, "userdata")
     }
 
     func testGlobalsSetWithLuaTable() {
@@ -121,19 +127,40 @@ final class LuaGlobalsAdvancedTests: XCTestCase {
 
     // MARK: - LuaReference Tests
 
-    func testLuaReferenceCreation() {
-        // Skip - requires LuaBridgeable conformance
-        XCTSkip("Requires LuaBridgeable conforming type")
+    func testLuaReferenceCreation() throws {
+        let object = TestGlobalsBridgeable()
+        let reference = lua.toReference(object)
+
+        reference.push()
+        defer { lua_pop(lua.luaState, 1) }
+
+        XCTAssertEqual(lua_type(lua.luaState, -1), LUA_TUSERDATA)
+        XCTAssertTrue(TestGlobalsBridgeable.checkUserdata(lua.luaState, at: -1) === object)
     }
 
-    func testLuaReferenceLifecycle() {
-        // Skip - requires LuaBridgeable conformance
-        XCTSkip("Requires LuaBridgeable conforming type")
+    func testLuaReferenceLifecycle() throws {
+        weak var weakReference: LuaReference?
+        let object = TestGlobalsBridgeable()
+
+        autoreleasepool {
+            let reference = lua.toReference(object)
+            weakReference = reference
+            XCTAssertNotNil(weakReference)
+        }
+
+        XCTAssertNil(weakReference)
     }
 
-    func testLuaReferenceWithWeakLuaState() {
-        // Skip - requires LuaBridgeable conformance
-        XCTSkip("Requires LuaBridgeable conforming type")
+    func testLuaReferenceWithWeakLuaState() throws {
+        let object = TestGlobalsBridgeable()
+        var localLua: LuaState? = try LuaState()
+        TestGlobalsBridgeable.register(in: localLua!, as: "TestBridgeable")
+
+        let reference = localLua!.toReference(object)
+        localLua = nil
+
+        reference.push()
+        XCTAssertTrue(true)
     }
 
     // MARK: - LuaTable Tests
@@ -256,8 +283,8 @@ final class LuaGlobalsAdvancedTests: XCTestCase {
 
         // Operations should handle nil luaState gracefully
         table["newKey"] = "newValue" // Should not crash
-        let value = table["key"] // Should still return the value
-        XCTAssertEqual(value as? String, "value") // Table still works even with nil luaState
+        let value = table["key"]
+        XCTAssertNil(value) // The Lua table cannot outlive its owning Lua state
     }
 
     func testLuaTablePushValue() {
@@ -309,9 +336,9 @@ final class LuaGlobalsAdvancedTests: XCTestCase {
         lua.globals.set("swiftTable", to: swiftTable)
 
         // Verify from Lua
-        let hasSwift = try? lua.executeReturning("""
+        let hasSwift = try? lua.execute("""
             return swiftTable.swift == "value"
-        """, as: Bool.self)
+        """, returning: Bool.self)
         XCTAssertEqual(hasSwift, true)
     }
 

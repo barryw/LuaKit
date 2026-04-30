@@ -165,6 +165,103 @@ public struct LuaBridgeableMacro: MemberMacro {
 
         return false
     }
+
+    private static func normalizedType(_ type: TypeSyntax) -> String {
+        type.description.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func normalizedType(_ type: String) -> String {
+        type.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func isArrayType(_ type: String) -> Bool {
+        let type = normalizedType(type)
+        return type.hasPrefix("[") && type.hasSuffix("]") && !type.contains(":")
+    }
+
+    private static func isDictionaryType(_ type: String) -> Bool {
+        let type = normalizedType(type)
+        return type.hasPrefix("[") && type.hasSuffix("]") && type.contains(":")
+    }
+
+    private static func isCollectionType(_ type: String) -> Bool {
+        isArrayType(type) || isDictionaryType(type)
+    }
+
+    private static func collectionExpectation(_ type: String) -> String {
+        if isArrayType(type) {
+            return "array for \(type)"
+        }
+        return "dictionary for \(type)"
+    }
+
+    private static func expectedTypeDescription(_ type: String) -> String {
+        let type = normalizedType(type)
+        if isCollectionType(type) {
+            return collectionExpectation(type)
+        }
+
+        switch type {
+        case "Int", "Int32", "Int64":
+            return "integer"
+        case "Double", "Float":
+            return "number"
+        case "String":
+            return "string"
+        case "Bool":
+            return "boolean"
+        default:
+            return type
+        }
+    }
+
+    private static func appendPullValue(
+        _ codeLines: inout [String],
+        type: String,
+        variableName: String,
+        luaIndex: Int,
+        failureMessage: String
+    ) {
+        let type = normalizedType(type)
+
+        if isCollectionType(type) || type.contains("?") || type == "Date" || type == "URL" || type == "UUID" || type == "Data" {
+            codeLines.append("guard let \(variableName) = \(type).pull(from: L, at: \(luaIndex)) else {")
+            codeLines.append("    return luaError(L, \"\(failureMessage)\")")
+            codeLines.append("}")
+        } else if type == "Int" || type == "Int32" || type == "Int64" {
+            codeLines.append("let \(variableName) = Int(luaL_checkinteger(L, \(luaIndex)))")
+        } else if type == "Double" {
+            codeLines.append("let \(variableName) = lua_tonumberx(L, \(luaIndex), nil)")
+        } else if type == "Float" {
+            codeLines.append("let \(variableName) = Float(lua_tonumberx(L, \(luaIndex), nil))")
+        } else if type == "String" {
+            codeLines.append("guard let \(variableName) = String.pull(from: L, at: \(luaIndex)) else {")
+            codeLines.append("    return luaError(L, \"\(failureMessage)\")")
+            codeLines.append("}")
+        } else if type == "Bool" {
+            codeLines.append("let \(variableName) = lua_toboolean(L, \(luaIndex)) != 0")
+        }
+    }
+
+    private static func appendPushValue(_ codeLines: inout [String], type: String, expression: String) {
+        let type = normalizedType(type)
+
+        if isCollectionType(type) || type == "Date" || type == "URL" || type == "UUID" || type == "Data" {
+            codeLines.append("\(type).push(\(expression), to: L)")
+        } else if type == "Int" || type == "Int32" || type == "Int64" ||
+                    type == "UInt" || type == "UInt32" || type == "UInt64" {
+            codeLines.append("lua_pushinteger(L, lua_Integer(\(expression)))")
+        } else if type == "Double" || type == "Float" {
+            codeLines.append("lua_pushnumber(L, lua_Number(\(expression)))")
+        } else if type == "String" {
+            codeLines.append("luaPushString(L, \(expression))")
+        } else if type == "Bool" {
+            codeLines.append("lua_pushboolean(L, \(expression) ? 1 : 0)")
+        } else {
+            codeLines.append("type(of: \(expression)).pushAny(\(expression), to: L)")
+        }
+    }
+
     static func generateLuaNewMethod(className: String, initializers: [InitializerDeclSyntax]) -> DeclSyntax {
         // For now, generate a basic luaNew that uses the first initializer
         let parameters = initializers.first?.signature.parameterClause.parameters ?? []
@@ -176,24 +273,16 @@ public struct LuaBridgeableMacro: MemberMacro {
         for (index, parameter) in parameters.enumerated() {
             let paramName = parameter.firstName.text
             let luaIndex = index + 1
+            let paramType = normalizedType(parameter.type)
 
-            // Type detection for constructor parameters
-            if parameter.type.description.contains("Int") {
-                codeLines.append("let \(paramName) = Int(luaL_checkinteger(L, \(luaIndex)))")
-                initArgs.append("\(paramName): \(paramName)")
-            } else if parameter.type.description.contains("Double") {
-                codeLines.append("let \(paramName) = lua_tonumberx(L, \(luaIndex), nil)")
-                initArgs.append("\(paramName): \(paramName)")
-            } else if parameter.type.description.contains("Float") {
-                codeLines.append("let \(paramName) = Float(lua_tonumberx(L, \(luaIndex), nil))")
-                initArgs.append("\(paramName): \(paramName)")
-            } else if parameter.type.description.contains("String") {
-                codeLines.append("guard let \(paramName) = String.pull(from: L, at: \(luaIndex)) else { return luaError(L, \"Expected string for \(paramName)\") }")
-                initArgs.append("\(paramName): \(paramName)")
-            } else if parameter.type.description.contains("Bool") {
-                codeLines.append("let \(paramName) = lua_toboolean(L, \(luaIndex)) != 0")
-                initArgs.append("\(paramName): \(paramName)")
-            }
+            appendPullValue(
+                &codeLines,
+                type: paramType,
+                variableName: paramName,
+                luaIndex: luaIndex,
+                failureMessage: "Expected \(expectedTypeDescription(paramType)) for \(paramName)"
+            )
+            initArgs.append("\(paramName): \(paramName)")
         }
 
         // Add instance creation and push statements
@@ -218,7 +307,7 @@ public static func luaNew(_ L: OpaquePointer) -> Int32 {
 public static func registerConstructor(_ L: OpaquePointer, name: String) {
     lua_createtable(L, 0, 1)
 
-    lua_pushstring(L, "new")
+    luaPushString(L, "new")
     lua_pushcclosure(L, { L in
         guard let L = L else { return 0 }
         return \(className).luaNew(L)
@@ -239,7 +328,7 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
             let parameters = method.signature.parameterClause.parameters
 
             codeLines.append("// Register \(methodName) method")
-            codeLines.append("lua_pushstring(L, \"\(methodName)\")")
+            codeLines.append("luaPushString(L, \"\(methodName)\")")
             codeLines.append("lua_pushcclosure(L, { L in")
             codeLines.append("    guard let L = L else { return 0 }")
             codeLines.append("    guard let obj = \(className).checkUserdata(L, at: 1) else {")
@@ -253,53 +342,42 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                 let paramName = parameter.secondName?.text ?? parameter.firstName.text
                 let argumentLabel = parameter.firstName.text == "_" ? "" : "\(parameter.firstName.text): "
                 let luaIndex = index + 2 // Start at 2 since 1 is the object itself
+                let paramType = normalizedType(parameter.type)
+                var extractionLines: [String] = []
 
-                if parameter.type.description.contains("Int") {
-                    codeLines.append("    let \(paramName) = Int(luaL_checkinteger(L, \(luaIndex)))")
-                    methodArgs.append("\(argumentLabel)\(paramName)")
-                } else if parameter.type.description.contains("Double") {
-                    codeLines.append("    let \(paramName) = lua_tonumberx(L, \(luaIndex), nil)")
-                    methodArgs.append("\(argumentLabel)\(paramName)")
-                } else if parameter.type.description.contains("Float") {
-                    codeLines.append("    let \(paramName) = Float(lua_tonumberx(L, \(luaIndex), nil))")
-                    methodArgs.append("\(argumentLabel)\(paramName)")
-                } else if parameter.type.description.contains("String") {
-                    codeLines.append("    guard let \(paramName) = String.pull(from: L, at: \(luaIndex)) else {")
-                    codeLines.append("        return luaError(L, \"Expected string for \(paramName)\")")
-                    codeLines.append("    }")
-                    methodArgs.append("\(argumentLabel)\(paramName)")
-                } else if parameter.type.description.contains("Bool") {
-                    codeLines.append("    let \(paramName) = lua_toboolean(L, \(luaIndex)) != 0")
-                    methodArgs.append("\(argumentLabel)\(paramName)")
-                }
+                appendPullValue(
+                    &extractionLines,
+                    type: paramType,
+                    variableName: paramName,
+                    luaIndex: luaIndex,
+                    failureMessage: "Expected \(expectedTypeDescription(paramType)) for \(paramName)"
+                )
+
+                codeLines.append(contentsOf: extractionLines.map { "    \($0)" })
+                methodArgs.append("\(argumentLabel)\(paramName)")
             }
 
             codeLines.append("")
             let methodArgsString = methodArgs.joined(separator: ", ")
 
             // Check if method has a return type
-            if let returnType = method.signature.returnClause?.type.description,
-               !returnType.trimmingCharacters(in: .whitespaces).isEmpty && returnType != "Void" {
+            if let rawReturnType = method.signature.returnClause?.type.description {
+                let returnType = normalizedType(rawReturnType)
+                guard !returnType.isEmpty && returnType != "Void" else {
+                    codeLines.append("    obj.\(methodName)(\(methodArgsString))")
+                    codeLines.append("    return 0")
+                    codeLines.append("}, 0)")
+                    codeLines.append("lua_settable(L, -3)")
+                    codeLines.append("")
+                    continue
+                }
+
                 codeLines.append("    let result = obj.\(methodName)(\(methodArgsString))")
 
-                // Handle different return types
-                if returnType.contains("Int") {
-                    codeLines.append("    lua_pushinteger(L, lua_Integer(result))")
-                    codeLines.append("    return 1")
-                } else if returnType.contains("Double") || returnType.contains("Float") {
-                    codeLines.append("    lua_pushnumber(L, lua_Number(result))")
-                    codeLines.append("    return 1")
-                } else if returnType.contains("String") {
-                    codeLines.append("    lua_pushstring(L, result)")
-                    codeLines.append("    return 1")
-                } else if returnType.contains("Bool") {
-                    codeLines.append("    lua_pushboolean(L, result ? 1 : 0)")
-                    codeLines.append("    return 1")
-                } else {
-                    // For complex return types, try to push as userdata
-                    codeLines.append("    push(result, to: L)")
-                    codeLines.append("    return 1")
-                }
+                var pushLines: [String] = []
+                appendPushValue(&pushLines, type: returnType, expression: "result")
+                codeLines.append(contentsOf: pushLines.map { "    \($0)" })
+                codeLines.append("    return 1")
             } else {
                 // Void return type
                 codeLines.append("    obj.\(methodName)(\(methodArgsString))")
@@ -315,7 +393,7 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
         if !properties.isEmpty {
             // Generate __index method for property reading
             codeLines.append("// Register __index method for property access")
-            codeLines.append("lua_pushstring(L, \"__index\")")
+            codeLines.append("luaPushString(L, \"__index\")")
             codeLines.append("lua_pushcclosure(L, { L in")
             codeLines.append("    guard let L = L else { return 0 }")
             codeLines.append("    guard let obj = \(className).checkUserdata(L, at: 1) else {")
@@ -333,11 +411,15 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                 for binding in property.bindings {
                     if let identPattern = binding.pattern.as(IdentifierPatternSyntax.self) {
                         let propName = identPattern.identifier.text
-                        let propType = binding.typeAnnotation?.type.description ?? "Unknown"
+                        let propType = binding.typeAnnotation.map { normalizedType($0.type) } ?? "Unknown"
 
                         codeLines.append("    case \"\(propName)\":")
                         // Handle array types first - return proxies instead of arrays
-                        if propType.contains("[String]") {
+                        if isDictionaryType(propType) {
+                            var pushLines: [String] = []
+                            appendPushValue(&pushLines, type: propType, expression: "obj.\(propName)")
+                            codeLines.append(contentsOf: pushLines.map { "        \($0)" })
+                        } else if propType == "[String]" {
                             codeLines.append("        let proxy = LuaStringArrayProxy(")
                             codeLines.append("            owner: obj,")
                             codeLines.append("            propertyName: \"\(propName)\",")
@@ -357,7 +439,7 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                             codeLines.append("            }")
                             codeLines.append("        )")
                             codeLines.append("        LuaStringArrayProxy.push(proxy, to: L)")
-                        } else if propType.contains("[Int]") {
+                        } else if propType == "[Int]" {
                             codeLines.append("        let proxy = LuaIntArrayProxy(")
                             codeLines.append("            owner: obj,")
                             codeLines.append("            propertyName: \"\(propName)\",")
@@ -377,7 +459,7 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                             codeLines.append("            }")
                             codeLines.append("        )")
                             codeLines.append("        LuaIntArrayProxy.push(proxy, to: L)")
-                        } else if propType.contains("[Double]") {
+                        } else if propType == "[Double]" {
                             codeLines.append("        let proxy = LuaDoubleArrayProxy(")
                             codeLines.append("            owner: obj,")
                             codeLines.append("            propertyName: \"\(propName)\",")
@@ -397,7 +479,7 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                             codeLines.append("            }")
                             codeLines.append("        )")
                             codeLines.append("        LuaDoubleArrayProxy.push(proxy, to: L)")
-                        } else if propType.contains("[Bool]") {
+                        } else if propType == "[Bool]" {
                             codeLines.append("        let proxy = LuaBoolArrayProxy(")
                             codeLines.append("            owner: obj,")
                             codeLines.append("            propertyName: \"\(propName)\",")
@@ -417,16 +499,10 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                             codeLines.append("            }")
                             codeLines.append("        )")
                             codeLines.append("        LuaBoolArrayProxy.push(proxy, to: L)")
-                        } else if propType.contains("Int") {
-                            codeLines.append("        lua_pushinteger(L, lua_Integer(obj.\(propName)))")
-                        } else if propType.contains("Double") || propType.contains("Float") {
-                            codeLines.append("        lua_pushnumber(L, lua_Number(obj.\(propName)))")
-                        } else if propType.contains("String") {
-                            codeLines.append("        lua_pushstring(L, obj.\(propName))")
-                        } else if propType.contains("Bool") {
-                            codeLines.append("        lua_pushboolean(L, obj.\(propName) ? 1 : 0)")
                         } else {
-                            codeLines.append("        push(obj.\(propName), to: L)")
+                            var pushLines: [String] = []
+                            appendPushValue(&pushLines, type: propType, expression: "obj.\(propName)")
+                            codeLines.append(contentsOf: pushLines.map { "        \($0)" })
                         }
                         codeLines.append("        return 1")
                     }
@@ -436,7 +512,7 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
             codeLines.append("    default:")
             codeLines.append("        // Check metatable for methods")
             codeLines.append("        lua_getmetatable(L, 1)")
-            codeLines.append("        lua_pushstring(L, key)")
+            codeLines.append("        luaPushString(L, key)")
             codeLines.append("        lua_rawget(L, -2)")
             codeLines.append("        return 1")
             codeLines.append("    }")
@@ -454,7 +530,7 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
 
             if !writableProperties.isEmpty {
                 codeLines.append("// Register __newindex method for property setting")
-                codeLines.append("lua_pushstring(L, \"__newindex\")")
+                codeLines.append("luaPushString(L, \"__newindex\")")
                 codeLines.append("lua_pushcclosure(L, { L in")
                 codeLines.append("    guard let L = L else { return 0 }")
                 codeLines.append("    guard let obj = \(className).checkUserdata(L, at: 1) else {")
@@ -471,7 +547,7 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                     for binding in property.bindings {
                         if let identPattern = binding.pattern.as(IdentifierPatternSyntax.self) {
                             let propName = identPattern.identifier.text
-                            let propType = binding.typeAnnotation?.type.description ?? "Unknown"
+                            let propType = binding.typeAnnotation.map { normalizedType($0.type) } ?? "Unknown"
 
                             codeLines.append("    case \"\(propName)\":")
 
@@ -480,7 +556,18 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
 
                             // Extract the new value based on type
                             // Handle array types first
-                            if propType.contains("[String]") {
+                            if isDictionaryType(propType) {
+                                codeLines.append("        guard let newValue = \(propType).pull(from: L, at: 3) else {")
+                                codeLines.append("            return luaError(L, \"Expected \(collectionExpectation(propType)) for \(propName)\")")
+                                codeLines.append("        }")
+                                codeLines.append("        switch obj.luaPropertyWillChange(\"\(propName)\", from: oldValue, to: newValue) {")
+                                codeLines.append("        case .success:")
+                                codeLines.append("            obj.\(propName) = newValue")
+                                codeLines.append("            obj.luaPropertyDidChange(\"\(propName)\", from: oldValue, to: newValue)")
+                                codeLines.append("        case .failure(let error):")
+                                codeLines.append("            return luaError(L, error.message)")
+                                codeLines.append("        }")
+                            } else if propType == "[String]" {
                                 codeLines.append("        guard let newValue = [String].pull(from: L, at: 3) else {")
                                 codeLines.append("            return luaError(L, \"Expected array of strings for \(propName)\")")
                                 codeLines.append("        }")
@@ -491,7 +578,7 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                                 codeLines.append("        case .failure(let error):")
                                 codeLines.append("            return luaError(L, error.message)")
                                 codeLines.append("        }")
-                            } else if propType.contains("[Int]") {
+                            } else if propType == "[Int]" {
                                 codeLines.append("        guard let newValue = [Int].pull(from: L, at: 3) else {")
                                 codeLines.append("            return luaError(L, \"Expected array of integers for \(propName)\")")
                                 codeLines.append("        }")
@@ -502,7 +589,7 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                                 codeLines.append("        case .failure(let error):")
                                 codeLines.append("            return luaError(L, error.message)")
                                 codeLines.append("        }")
-                            } else if propType.contains("[Double]") {
+                            } else if propType == "[Double]" {
                                 codeLines.append("        guard let newValue = [Double].pull(from: L, at: 3) else {")
                                 codeLines.append("            return luaError(L, \"Expected array of numbers for \(propName)\")")
                                 codeLines.append("        }")
@@ -513,7 +600,7 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                                 codeLines.append("        case .failure(let error):")
                                 codeLines.append("            return luaError(L, error.message)")
                                 codeLines.append("        }")
-                            } else if propType.contains("[Bool]") {
+                            } else if propType == "[Bool]" {
                                 codeLines.append("        guard let newValue = [Bool].pull(from: L, at: 3) else {")
                                 codeLines.append("            return luaError(L, \"Expected array of booleans for \(propName)\")")
                                 codeLines.append("        }")
@@ -524,7 +611,7 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                                 codeLines.append("        case .failure(let error):")
                                 codeLines.append("            return luaError(L, error.message)")
                                 codeLines.append("        }")
-                            } else if propType.contains("Int") {
+                            } else if propType == "Int" || propType == "Int32" || propType == "Int64" {
                                 codeLines.append("        let newValue = Int(luaL_checkinteger(L, 3))")
                                 codeLines.append("        switch obj.luaPropertyWillChange(\"\(propName)\", from: oldValue, to: newValue) {")
                                 codeLines.append("        case .success:")
@@ -533,7 +620,7 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                                 codeLines.append("        case .failure(let error):")
                                 codeLines.append("            return luaError(L, error.message)")
                                 codeLines.append("        }")
-                            } else if propType.contains("Double") {
+                            } else if propType == "Double" {
                                 codeLines.append("        let newValue = lua_tonumberx(L, 3, nil)")
                                 codeLines.append("        switch obj.luaPropertyWillChange(\"\(propName)\", from: oldValue, to: newValue) {")
                                 codeLines.append("        case .success:")
@@ -542,7 +629,7 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                                 codeLines.append("        case .failure(let error):")
                                 codeLines.append("            return luaError(L, error.message)")
                                 codeLines.append("        }")
-                            } else if propType.contains("Float") {
+                            } else if propType == "Float" {
                                 codeLines.append("        let newValue = Float(lua_tonumberx(L, 3, nil))")
                                 codeLines.append("        switch obj.luaPropertyWillChange(\"\(propName)\", from: oldValue, to: newValue) {")
                                 codeLines.append("        case .success:")
@@ -551,7 +638,7 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                                 codeLines.append("        case .failure(let error):")
                                 codeLines.append("            return luaError(L, error.message)")
                                 codeLines.append("        }")
-                            } else if propType.contains("String") {
+                            } else if propType == "String" {
                                 codeLines.append("        guard let newValue = String.pull(from: L, at: 3) else {")
                                 codeLines.append("            return luaError(L, \"Expected string for \(propName)\")")
                                 codeLines.append("        }")
@@ -562,7 +649,7 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
                                 codeLines.append("        case .failure(let error):")
                                 codeLines.append("            return luaError(L, error.message)")
                                 codeLines.append("        }")
-                            } else if propType.contains("Bool") {
+                            } else if propType == "Bool" {
                                 codeLines.append("        let newValue = lua_toboolean(L, 3) != 0")
                                 codeLines.append("        switch obj.luaPropertyWillChange(\"\(propName)\", from: oldValue, to: newValue) {")
                                 codeLines.append("        case .success:")
@@ -588,13 +675,13 @@ public static func registerConstructor(_ L: OpaquePointer, name: String) {
 
         // Generate __tostring method
         codeLines.append("// Register __tostring method")
-        codeLines.append("lua_pushstring(L, \"__tostring\")")
+        codeLines.append("luaPushString(L, \"__tostring\")")
         codeLines.append("lua_pushcclosure(L, { L in")
         codeLines.append("    guard let L = L else { return 0 }")
         codeLines.append("    guard let obj = \(className).checkUserdata(L, at: 1) else {")
         codeLines.append("        return luaError(L, \"Invalid \(className) object\")")
         codeLines.append("    }")
-        codeLines.append("    lua_pushstring(L, obj.description)")
+        codeLines.append("    luaPushString(L, obj.description)")
         codeLines.append("    return 1")
         codeLines.append("}, 0)")
         codeLines.append("lua_settable(L, -3)")

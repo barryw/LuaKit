@@ -14,7 +14,7 @@ final class LuaKitTests: XCTestCase {
         let lua = try LuaState()
         XCTAssertNotNil(lua)
 
-        let result = try lua.executeReturning("return 'LuaKit is working!'", as: String.self)
+        let result = try lua.execute("return 'LuaKit is working!'", returning: String.self)
         XCTAssertEqual(result, "LuaKit is working!")
     }
 

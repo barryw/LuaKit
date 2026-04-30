@@ -7,22 +7,26 @@
 
 import Foundation
 import Lua
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
-public final class LuaState {
+public final class LuaState: @unchecked Sendable {
     private let L: OpaquePointer
+    private let stateLock = NSRecursiveLock()
+    private let memoryQuota: LuaMemoryQuota?
+    private var sandboxConfigurationStorage: LuaSandboxConfiguration?
+    private var activeSandboxConfiguration: LuaSandboxConfiguration?
+    private var sandboxInstructionCount = 0
+    private var sandboxDeadline: Date?
 
     /// Internal access to the Lua state for extensions
     internal var luaState: OpaquePointer { L }
 
-    public init() throws {
-        guard let state = luaL_newstate() else {
-            throw LuaError.memoryAllocation
-        }
-        self.L = state
-        // Lua 5.5.0: luaL_openlibs is now a macro, call underlying function directly
-        luaL_openselectedlibs(L, ~0, 0)
-        setupPrintCapture()
-        registerArrayProxyTypes()
+    public convenience init() throws {
+        try self.init(libraries: .all, sandbox: nil)
     }
 
     /// Initialize a Lua state with selective library loading.
@@ -45,20 +49,57 @@ public final class LuaState {
     /// // Custom selection
     /// let custom = try LuaState(libraries: [.base, .string, .math])
     /// ```
-    public init(libraries: LuaLibrary) throws {
-        guard let state = luaL_newstate() else {
+    public convenience init(libraries: LuaLibrary) throws {
+        try self.init(libraries: libraries, sandbox: nil)
+    }
+
+    /// Initialize a Lua state with sandbox controls.
+    ///
+    /// Memory limits are enforced from state creation. Instruction and wall-time
+    /// limits are enforced for each protected call made through `LuaState` and
+    /// `LuaCallable`.
+    public convenience init(sandbox configuration: LuaSandboxConfiguration = .default) throws {
+        try self.init(libraries: configuration.libraries, sandbox: configuration)
+    }
+
+    private init(libraries: LuaLibrary, sandbox configuration: LuaSandboxConfiguration?) throws {
+        let quota = configuration?.memoryLimitBytes.map(LuaMemoryQuota.init(limit:))
+        let state: OpaquePointer?
+
+        if let quota {
+            state = lua_newstate(
+                LuaState.memoryQuotaAllocator,
+                Unmanaged.passUnretained(quota).toOpaque(),
+                luaL_makeseed(nil)
+            )
+        } else {
+            state = luaL_newstate()
+        }
+
+        guard let state else {
             throw LuaError.memoryAllocation
         }
+
         self.L = state
-        // Lua 5.5.0: Use luaL_openselectedlibs with the library bitmask
+        self.memoryQuota = quota
+        self.sandboxConfigurationStorage = configuration
+
+        // Lua 5.5.0: Use luaL_openselectedlibs with the library bitmask.
         luaL_openselectedlibs(L, Int32(libraries.rawValue), 0)
         setupPrintCapture()
         registerArrayProxyTypes()
+
+        if configuration?.removeUnsafeGlobals == true {
+            removeUnsafeGlobals()
+        }
     }
 
     deinit {
-        LuaState.stateStorage.unregister(L)
-        lua_close(L)
+        withLuaLock {
+            LuaState.stateStorage.unregister(L)
+            lua_sethook(L, nil, 0, 0)
+            lua_close(L)
+        }
     }
 
     private var printOutput: String = ""
@@ -83,32 +124,44 @@ public final class LuaState {
     ///
     /// - Parameter handler: A closure that receives each line of print output.
     public func onPrint(_ handler: @escaping (String) -> Void) {
-        self.printHandler = handler
+        withLuaLock {
+            self.printHandler = handler
+        }
     }
 
     @available(*, deprecated, renamed: "onPrint(_:)")
     public func setPrintHandler(_ handler: @escaping (String) -> Void) {
-        self.printHandler = handler
+        withLuaLock {
+            self.printHandler = handler
+        }
     }
 
     /// Configure the print buffer policy for managing output accumulation
     public func setPrintBufferPolicy(_ policy: PrintBufferPolicy) {
-        self.printBufferPolicy = policy
+        withLuaLock {
+            self.printBufferPolicy = policy
+        }
     }
 
     @available(*, deprecated, renamed: "onPrint(_:)")
     public func setOutputHandler(_ handler: @escaping PrintOutputHandler) {
-        self.printHandler = handler
+        withLuaLock {
+            self.printHandler = handler
+        }
     }
 
     /// Clear the print buffer manually
     public func clearPrintBuffer() {
-        printOutput = ""
+        withLuaLock {
+            printOutput = ""
+        }
     }
 
     /// Get current buffer contents without executing any code
     public func getCurrentPrintBuffer() -> String {
-        return printOutput
+        withLuaLock {
+            return printOutput
+        }
     }
 
     private func setupPrintCapture() {
@@ -119,43 +172,49 @@ public final class LuaState {
             let n = lua_gettop(L)
             var output = ""
 
-            for i in 1...n {
-                if i > 1 { output += "\t" }
+            if n > 0 {
+                for i in 1...n {
+                    if i > 1 { output += "\t" }
 
-                if luaL_callmeta(L, i, "__tostring") != 0 {
-                    if let str = lua_tolstring(L, -1, nil) {
-                        output += String(cString: str)
-                    }
-                    lua_settop(L, -2)
-                } else {
-                    let type = lua_type(L, i)
-                    switch type {
-                    case LUA_TNIL:
-                        output += "nil"
-                    case LUA_TBOOLEAN:
-                        output += lua_toboolean(L, i) != 0 ? "true" : "false"
-                    case LUA_TNUMBER:
-                        if lua_isinteger(L, i) != 0 {
-                            output += String(lua_tointegerx(L, i, nil))
-                        } else {
-                            output += String(lua_tonumberx(L, i, nil))
+                    if luaL_callmeta(L, i, "__tostring") != 0 {
+                        if let str = luaString(L, at: -1) {
+                            output += str
                         }
-                    case LUA_TSTRING:
-                        if let str = lua_tolstring(L, i, nil) {
-                            output += String(cString: str)
-                        }
-                    default:
-                        if let str = luaL_tolstring(L, i, nil) {
-                            output += String(cString: str)
-                            lua_settop(L, -2)
+                        lua_settop(L, -2)
+                    } else {
+                        let type = lua_type(L, i)
+                        switch type {
+                        case LUA_TNIL:
+                            output += "nil"
+                        case LUA_TBOOLEAN:
+                            output += lua_toboolean(L, i) != 0 ? "true" : "false"
+                        case LUA_TNUMBER:
+                            if lua_isinteger(L, i) != 0 {
+                                output += String(lua_tointegerx(L, i, nil))
+                            } else {
+                                output += String(lua_tonumberx(L, i, nil))
+                            }
+                        case LUA_TSTRING:
+                            if let str = luaString(L, at: i) {
+                                output += str
+                            }
+                        default:
+                            if luaL_tolstring(L, i, nil) != nil {
+                                if let str = luaString(L, at: -1) {
+                                    output += str
+                                }
+                                lua_settop(L, -2)
+                            }
                         }
                     }
                 }
             }
 
             output += "\n"
-            state?.printOutput += output
-            state?.printHandler?(output)
+            state?.withLuaLock {
+                state?.printOutput += output
+                state?.printHandler?(output)
+            }
 
             return 0
         }, 0)
@@ -167,7 +226,15 @@ public final class LuaState {
     /// Thread-safe storage for LuaState lookup by raw pointer.
     /// This is needed for C callbacks (like print) to find the Swift LuaState.
     private final class StateStorage: @unchecked Sendable {
-        private var states: [OpaquePointer: LuaState] = [:]
+        private final class WeakState {
+            weak var state: LuaState?
+
+            init(_ state: LuaState) {
+                self.state = state
+            }
+        }
+
+        private var states: [OpaquePointer: WeakState] = [:]
         private let lock = NSLock()
 
         static let shared = StateStorage()
@@ -176,14 +243,18 @@ public final class LuaState {
             get {
                 lock.lock()
                 defer { lock.unlock() }
-                return states[L]
+                guard let state = states[L]?.state else {
+                    states.removeValue(forKey: L)
+                    return nil
+                }
+                return state
             }
         }
 
         func register(_ state: LuaState, for L: OpaquePointer) {
             lock.lock()
             defer { lock.unlock() }
-            states[L] = state
+            states[L] = WeakState(state)
         }
 
         func unregister(_ L: OpaquePointer) {
@@ -195,6 +266,202 @@ public final class LuaState {
 
     private static var stateStorage: StateStorage { StateStorage.shared }
 
+    /// Current sandbox configuration for this state, if one is active.
+    public var sandboxConfiguration: LuaSandboxConfiguration? {
+        withLuaLock {
+            sandboxConfigurationStorage
+        }
+    }
+
+    /// Current Lua allocator usage when the state was created with a memory limit.
+    public var currentMemoryUsage: Int? {
+        memoryQuota?.currentUsage
+    }
+
+    /// Peak Lua allocator usage when the state was created with a memory limit.
+    public var peakMemoryUsage: Int? {
+        memoryQuota?.peakUsage
+    }
+
+    /// Update instruction and wall-time sandbox controls for future protected calls.
+    ///
+    /// Memory limits cannot be changed after state creation because Lua's allocator
+    /// is installed when the state is created.
+    public func configureSandbox(_ configuration: LuaSandboxConfiguration?) {
+        withLuaLock {
+            sandboxConfigurationStorage = configuration
+            if configuration?.removeUnsafeGlobals == true {
+                removeUnsafeGlobals()
+            }
+        }
+    }
+
+    /// Execute direct Lua C API access while holding the state's serialization lock.
+    ///
+    /// This is useful for advanced integrations that need raw pointer access but
+    /// still want the same per-state concurrency model used by LuaKit.
+    public func withExclusiveAccess<R>(_ body: (OpaquePointer) throws -> R) rethrows -> R {
+        try withLuaLock {
+            try body(L)
+        }
+    }
+
+    @discardableResult
+    internal func withLuaLock<R>(_ body: () throws -> R) rethrows -> R {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return try body()
+    }
+
+    @discardableResult
+    internal func protectedCall(argumentCount: Int32, resultCount: Int32) -> Int32 {
+        installSandboxHookIfNeeded(on: L)
+        defer { clearSandboxHook(from: L) }
+        return lua_pcallk(L, argumentCount, resultCount, 0, 0, nil)
+    }
+
+    @discardableResult
+    internal func protectedResume(
+        thread: OpaquePointer,
+        argumentCount: Int32,
+        resultCount: inout Int32
+    ) -> Int32 {
+        installSandboxHookIfNeeded(on: thread)
+        defer { clearSandboxHook(from: thread) }
+        return lua_resume(thread, nil, argumentCount, &resultCount)
+    }
+
+    internal func registerThread(_ thread: OpaquePointer) {
+        LuaState.stateStorage.register(self, for: thread)
+    }
+
+    internal func unregisterThread(_ thread: OpaquePointer) {
+        LuaState.stateStorage.unregister(thread)
+    }
+
+    private func installSandboxHookIfNeeded(on state: OpaquePointer) {
+        guard let configuration = sandboxConfigurationStorage,
+              configuration.instructionLimit != nil || configuration.wallTimeLimit != nil else {
+            return
+        }
+
+        activeSandboxConfiguration = configuration
+        sandboxInstructionCount = 0
+        sandboxDeadline = configuration.wallTimeLimit.map { Date().addingTimeInterval($0) }
+        lua_sethook(state, LuaState.sandboxHook, LUA_MASKCOUNT, Int32(configuration.hookInterval))
+    }
+
+    private func clearSandboxHook(from state: OpaquePointer) {
+        guard activeSandboxConfiguration != nil else { return }
+        lua_sethook(state, nil, 0, 0)
+        activeSandboxConfiguration = nil
+        sandboxInstructionCount = 0
+        sandboxDeadline = nil
+    }
+
+    private func sandboxViolationMessage() -> String? {
+        guard let configuration = activeSandboxConfiguration else { return nil }
+
+        sandboxInstructionCount += configuration.hookInterval
+        if let limit = configuration.instructionLimit, sandboxInstructionCount >= limit {
+            return "Lua sandbox instruction limit exceeded (\(limit) instructions)"
+        }
+
+        if let deadline = sandboxDeadline, Date() >= deadline {
+            return "Lua sandbox wall-time limit exceeded"
+        }
+
+        return nil
+    }
+
+    private static let sandboxHook: lua_Hook = { L, _ in
+        guard let L,
+              let state = LuaState.stateStorage[L] else {
+            return
+        }
+
+        let message = state.withLuaLock {
+            state.sandboxViolationMessage()
+        }
+
+        if let message {
+            luaPushString(L, message)
+            _ = lua_error(L)
+        }
+    }
+
+    private func removeUnsafeGlobals() {
+        let names = [
+            "collectgarbage", "debug", "dofile", "io", "loadfile",
+            "os", "package", "require"
+        ]
+
+        for name in names {
+            lua_pushnil(L)
+            lua_setglobal(L, name)
+        }
+    }
+
+    private static let memoryQuotaAllocator: lua_Alloc = { userData, pointer, oldSize, newSize in
+        guard let userData else {
+            if newSize == 0 {
+                free(pointer)
+                return nil
+            }
+            return realloc(pointer, newSize)
+        }
+
+        let quota = Unmanaged<LuaMemoryQuota>.fromOpaque(userData).takeUnretainedValue()
+        return quota.reallocate(pointer: pointer, oldSize: oldSize, newSize: newSize)
+    }
+
+    private final class LuaMemoryQuota: @unchecked Sendable {
+        let limit: Int
+        private var usedBytes = 0
+        private var peakBytes = 0
+        private let lock = NSLock()
+
+        init(limit: Int) {
+            self.limit = limit
+        }
+
+        var currentUsage: Int {
+            lock.lock()
+            defer { lock.unlock() }
+            return usedBytes
+        }
+
+        var peakUsage: Int {
+            lock.lock()
+            defer { lock.unlock() }
+            return peakBytes
+        }
+
+        func reallocate(pointer: UnsafeMutableRawPointer?, oldSize: Int, newSize: Int) -> UnsafeMutableRawPointer? {
+            lock.lock()
+            defer { lock.unlock() }
+
+            if newSize == 0 {
+                usedBytes = max(0, usedBytes - oldSize)
+                free(pointer)
+                return nil
+            }
+
+            let delta = newSize - oldSize
+            if delta > 0 && usedBytes + delta > limit {
+                return nil
+            }
+
+            guard let newPointer = realloc(pointer, newSize) else {
+                return nil
+            }
+
+            usedBytes = max(0, usedBytes + delta)
+            peakBytes = max(peakBytes, usedBytes)
+            return newPointer
+        }
+    }
+
     private func registerArrayProxyTypes() {
         // Register array proxy types for each supported element type
         LuaStringArrayProxy.register(in: self, as: "_StringArrayProxy")
@@ -203,21 +470,26 @@ public final class LuaState {
         LuaBoolArrayProxy.register(in: self, as: "_BoolArrayProxy")
     }
 
+    @discardableResult
     public func execute(_ code: String) throws -> String {
-        // Don't reset buffer automatically - let user control this
-        // printOutput = ""  // REMOVED - users can call clearPrintBuffer() if needed
+        try withLuaLock {
+            // Don't reset buffer automatically - let user control this
+            // printOutput = ""  // REMOVED - users can call clearPrintBuffer() if needed
+            let baseTop = lua_gettop(L)
 
-        if luaL_loadstring(L, code) != LUA_OK {
-            let error = getError()
-            throw LuaError.syntax(error)
+            if luaL_loadstring(L, code) != LUA_OK {
+                let error = getError()
+                throw LuaError.syntax(error)
+            }
+
+            if protectedCall(argumentCount: 0, resultCount: LUA_MULTRET) != LUA_OK {
+                let error = getError()
+                throw LuaError.runtime(error)
+            }
+
+            lua_settop(L, baseTop)
+            return managePrintBuffer()
         }
-
-        if lua_pcallk(L, 0, LUA_MULTRET, 0, 0, nil) != LUA_OK {
-            let error = getError()
-            throw LuaError.runtime(error)
-        }
-
-        return managePrintBuffer()
     }
 
     /// Manage print buffer according to configured policy
@@ -260,23 +532,30 @@ public final class LuaState {
     /// let sum: Int = try lua.execute("return 10 + 20", returning: Int.self)
     /// ```
     public func execute<T: LuaConvertible>(_ code: String, returning type: T.Type) throws -> T {
-        if luaL_loadstring(L, code) != LUA_OK {
-            let error = getError()
-            throw LuaError.syntax(error)
-        }
+        try withLuaLock {
+            let baseTop = lua_gettop(L)
 
-        if lua_pcallk(L, 0, 1, 0, 0, nil) != LUA_OK {
-            let error = getError()
-            throw LuaError.runtime(error)
-        }
+            if luaL_loadstring(L, code) != LUA_OK {
+                let error = getError()
+                lua_settop(L, baseTop)
+                throw LuaError.syntax(error)
+            }
 
-        guard let result = T.pull(from: L, at: -1) else {
-            lua_settop(L, -2)
-            throw LuaError.typeMismatch(expected: String(describing: T.self), got: luaTypeName(at: -1))
-        }
+            if protectedCall(argumentCount: 0, resultCount: 1) != LUA_OK {
+                let error = getError()
+                lua_settop(L, baseTop)
+                throw LuaError.runtime(error)
+            }
 
-        lua_settop(L, -2)
-        return result
+            guard let result = T.pull(from: L, at: -1) else {
+                let actualType = luaTypeName(at: -1)
+                lua_settop(L, baseTop)
+                throw LuaError.typeMismatch(expected: String(describing: T.self), got: actualType)
+            }
+
+            lua_settop(L, baseTop)
+            return result
+        }
     }
 
     @available(*, deprecated, renamed: "execute(_:returning:)")
@@ -285,8 +564,7 @@ public final class LuaState {
     }
 
     private func getError() -> String {
-        if let errorStr = lua_tolstring(L, -1, nil) {
-            let error = String(cString: errorStr)
+        if let error = luaString(L, at: -1) {
             lua_settop(L, -2)
             return error
         }
@@ -303,7 +581,9 @@ public final class LuaState {
     }
 
     public func register<T: LuaBridgeable>(_ type: T.Type, as name: String) {
-        type.register(in: self, as: name)
+        withLuaLock {
+            type.register(in: self, as: name)
+        }
     }
 }
 
@@ -368,14 +648,24 @@ extension Double: LuaConvertible {
     }
 }
 
+extension Float: LuaConvertible {
+    public static func push(_ value: Float, to L: OpaquePointer) {
+        lua_pushnumber(L, lua_Number(value))
+    }
+
+    public static func pull(from L: OpaquePointer, at index: Int32) -> Float? {
+        guard lua_type(L, index) == LUA_TNUMBER else { return nil }
+        return Float(lua_tonumberx(L, index, nil))
+    }
+}
+
 extension String: LuaConvertible {
     public static func push(_ value: String, to L: OpaquePointer) {
-        lua_pushstring(L, value)
+        luaPushString(L, value)
     }
 
     public static func pull(from L: OpaquePointer, at index: Int32) -> String? {
-        guard let cStr = lua_tolstring(L, index, nil) else { return nil }
-        return String(cString: cStr)
+        return luaString(L, at: index)
     }
 }
 

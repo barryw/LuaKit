@@ -20,16 +20,16 @@ final class GlobalsTests: XCTestCase {
         globals["myBool"] = true
 
         // Verify from Lua
-        let stringResult = try lua.executeReturning("return myString", as: String.self)
+        let stringResult = try lua.execute("return myString", returning: String.self)
         XCTAssertEqual(stringResult, "Hello")
 
-        let intResult = try lua.executeReturning("return myNumber", as: Int.self)
+        let intResult = try lua.execute("return myNumber", returning: Int.self)
         XCTAssertEqual(intResult, 42)
 
-        let doubleResult = try lua.executeReturning("return myDouble", as: Double.self)
+        let doubleResult = try lua.execute("return myDouble", returning: Double.self)
         XCTAssertEqual(doubleResult, 3.14, accuracy: 0.001)
 
-        let boolResult = try lua.executeReturning("return myBool", as: Bool.self)
+        let boolResult = try lua.execute("return myBool", returning: Bool.self)
         XCTAssertEqual(boolResult, true)
     }
 
@@ -71,7 +71,7 @@ final class GlobalsTests: XCTestCase {
         globals["toBeNil"] = nil
 
         // Verify it's nil in Lua
-        let isNil = try lua.executeReturning("return toBeNil == nil", as: Bool.self)
+        let isNil = try lua.execute("return toBeNil == nil", returning: Bool.self)
         XCTAssertTrue(isNil)
 
         // Get nil from Swift

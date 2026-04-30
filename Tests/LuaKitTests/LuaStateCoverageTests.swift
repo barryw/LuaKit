@@ -70,7 +70,7 @@ final class LuaStateCoverageTests: XCTestCase {
     func testSetOutputHandler() {
         var capturedOutput = ""
 
-        lua.setOutputHandler { output in
+        lua.onPrint { output in
             capturedOutput += output
         }
 
@@ -83,7 +83,7 @@ final class LuaStateCoverageTests: XCTestCase {
         var callCount = 0
         var outputs: [String] = []
 
-        lua.setOutputHandler { output in
+        lua.onPrint { output in
             callCount += 1
             outputs.append(output)
         }

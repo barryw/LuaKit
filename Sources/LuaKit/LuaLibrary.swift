@@ -83,3 +83,49 @@ public struct LuaLibrary: OptionSet, Sendable {
         .base, .coroutine, .table, .string, .math, .utf8
     ]
 }
+
+/// Runtime restrictions for executing Lua code in a constrained environment.
+///
+/// `LuaSandboxConfiguration` combines selective standard-library loading with
+/// execution limits. Instruction and wall-time limits are enforced through Lua's
+/// debug hook and are checked between Lua VM instructions. Memory limits are
+/// enforced by a custom allocator and must be supplied when creating the
+/// `LuaState`.
+public struct LuaSandboxConfiguration: Sendable, Equatable {
+    /// Standard libraries loaded into the state.
+    public let libraries: LuaLibrary
+
+    /// Maximum approximate VM instructions allowed for each protected call.
+    public let instructionLimit: Int?
+
+    /// Maximum wall-clock time allowed for each protected call.
+    public let wallTimeLimit: TimeInterval?
+
+    /// Maximum bytes the Lua allocator may hold at one time.
+    public let memoryLimitBytes: Int?
+
+    /// Number of Lua VM instructions between sandbox hook checks.
+    public let hookInterval: Int
+
+    /// Whether known dangerous globals should be removed after library loading.
+    public let removeUnsafeGlobals: Bool
+
+    public init(
+        libraries: LuaLibrary = .sandboxed,
+        instructionLimit: Int? = 1_000_000,
+        wallTimeLimit: TimeInterval? = nil,
+        memoryLimitBytes: Int? = nil,
+        hookInterval: Int = 1_000,
+        removeUnsafeGlobals: Bool = true
+    ) {
+        self.libraries = libraries
+        self.instructionLimit = instructionLimit.map { max(1, $0) }
+        self.wallTimeLimit = wallTimeLimit.map { max(0, $0) }
+        self.memoryLimitBytes = memoryLimitBytes.map { max(1, $0) }
+        self.hookInterval = max(1, hookInterval)
+        self.removeUnsafeGlobals = removeUnsafeGlobals
+    }
+
+    /// Default restrictions for untrusted scripts.
+    public static let `default` = LuaSandboxConfiguration()
+}

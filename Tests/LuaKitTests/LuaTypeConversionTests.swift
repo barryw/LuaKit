@@ -9,6 +9,12 @@ import Lua
 @testable import LuaKit
 import XCTest
 
+private struct StringLengthConverter: LuaTypeConverter {
+    static func convert(_ input: String) throws -> Int {
+        input.count
+    }
+}
+
 final class LuaTypeConversionTests: XCTestCase {
     var L: OpaquePointer!
 
@@ -48,13 +54,13 @@ final class LuaTypeConversionTests: XCTestCase {
 
     func testStringToUUIDConverterInvalidFormat() {
         XCTAssertThrowsError(try StringToUUIDConverter.convert("not-a-uuid")) { error in
-            guard let luaKitError = error as? LuaKitError,
-                  case .invalidArgument(let context) = luaKitError else {
-                XCTFail("Expected LuaKitError.invalidArgument")
+            guard let luaError = error as? LuaError,
+                  case .invalidArgument(let message) = luaError else {
+                XCTFail("Expected LuaError.invalidArgument")
                 return
             }
 
-            XCTAssertTrue(context.generateMessage().contains("Invalid UUID format"))
+            XCTAssertTrue(message.contains("Invalid UUID format"))
         }
     }
 
@@ -76,14 +82,14 @@ final class LuaTypeConversionTests: XCTestCase {
 
     func testStringToDateConverterInvalidFormat() {
         XCTAssertThrowsError(try StringToDateConverter.convert("2023/12/25")) { error in
-            guard let luaKitError = error as? LuaKitError,
-                  case .invalidArgument(let context) = luaKitError else {
-                XCTFail("Expected LuaKitError.invalidArgument")
+            guard let luaError = error as? LuaError,
+                  case .invalidArgument(let message) = luaError else {
+                XCTFail("Expected LuaError.invalidArgument")
                 return
             }
 
-            XCTAssertTrue(context.generateMessage().contains("Invalid date format"))
-            XCTAssertTrue(context.generateMessage().contains("YYYY-MM-DDTHH:MM:SS.sssZ"))
+            XCTAssertTrue(message.contains("Invalid date format"))
+            XCTAssertTrue(message.contains("YYYY-MM-DDTHH:MM:SS.sssZ"))
         }
     }
 
@@ -97,13 +103,13 @@ final class LuaTypeConversionTests: XCTestCase {
 
     func testStringToURLConverterInvalidFormat() {
         XCTAssertThrowsError(try StringToURLConverter.convert("")) { error in
-            guard let luaKitError = error as? LuaKitError,
-                  case .invalidArgument(let context) = luaKitError else {
-                XCTFail("Expected LuaKitError.invalidArgument")
+            guard let luaError = error as? LuaError,
+                  case .invalidArgument(let message) = luaError else {
+                XCTFail("Expected LuaError.invalidArgument")
                 return
             }
 
-            XCTAssertTrue(context.generateMessage().contains("Invalid URL format"))
+            XCTAssertTrue(message.contains("Invalid URL format"))
         }
     }
 
@@ -119,13 +125,13 @@ final class LuaTypeConversionTests: XCTestCase {
 
     func testNumberToTimeIntervalConverterNegative() {
         XCTAssertThrowsError(try NumberToTimeIntervalConverter.convert(-1.0)) { error in
-            guard let luaKitError = error as? LuaKitError,
-                  case .invalidArgument(let context) = luaKitError else {
-                XCTFail("Expected LuaKitError.invalidArgument")
+            guard let luaError = error as? LuaError,
+                  case .invalidArgument(let message) = luaError else {
+                XCTFail("Expected LuaError.invalidArgument")
                 return
             }
 
-            XCTAssertTrue(context.generateMessage().contains("TimeInterval cannot be negative"))
+            XCTAssertTrue(message.contains("TimeInterval cannot be negative"))
         }
     }
 
@@ -279,13 +285,50 @@ final class LuaTypeConversionTests: XCTestCase {
 
     func testLuaConvertMissingConverter() {
         XCTAssertThrowsError(try LuaConvert.convert("test", using: "nonexistent") as String) { error in
-            guard let luaKitError = error as? LuaKitError,
-                  case .invalidArgument(let context) = luaKitError else {
-                XCTFail("Expected LuaKitError.invalidArgument")
+            guard let luaError = error as? LuaError,
+                  case .invalidArgument(let message) = luaError else {
+                XCTFail("Expected LuaError.invalidArgument")
                 return
             }
 
-            XCTAssertTrue(context.generateMessage().contains("No converter registered"))
+            XCTAssertTrue(message.contains("No converter registered"))
+        }
+    }
+
+    func testLuaConvertDispatchesRegisteredConverter() throws {
+        LuaTypeConverterRegistry.register(StringLengthConverter.self, name: "test.stringLength")
+
+        let length: Int = try LuaConvert.convert("LuaKit", using: "test.stringLength")
+        XCTAssertEqual(length, 6)
+    }
+
+    func testLuaConvertRejectsInvalidInputType() {
+        LuaTypeConverterRegistry.register(StringLengthConverter.self, name: "test.stringLength.input")
+
+        XCTAssertThrowsError(try LuaConvert.convert(42, using: "test.stringLength.input") as Int) { error in
+            guard let luaError = error as? LuaError,
+                  case .invalidArgument(let message) = luaError else {
+                XCTFail("Expected LuaError.invalidArgument")
+                return
+            }
+
+            XCTAssertTrue(message.contains("expected String"))
+            XCTAssertTrue(message.contains("got Int"))
+        }
+    }
+
+    func testLuaConvertRejectsUnexpectedOutputType() {
+        LuaTypeConverterRegistry.register(StringLengthConverter.self, name: "test.stringLength.output")
+
+        XCTAssertThrowsError(try LuaConvert.convert("LuaKit", using: "test.stringLength.output") as String) { error in
+            guard let luaError = error as? LuaError,
+                  case .invalidArgument(let message) = luaError else {
+                XCTFail("Expected LuaError.invalidArgument")
+                return
+            }
+
+            XCTAssertTrue(message.contains("returned Int"))
+            XCTAssertTrue(message.contains("expected String"))
         }
     }
 

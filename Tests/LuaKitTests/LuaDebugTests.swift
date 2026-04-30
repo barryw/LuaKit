@@ -56,7 +56,6 @@ private final class MessageCapture: @unchecked Sendable {
     }
 }
 
-@MainActor
 final class LuaDebugTests: XCTestCase {
     private var originalLogger: (@Sendable (String, LuaDebugConfig.LogLevel) -> Void)?
 
@@ -397,6 +396,7 @@ final class LuaDebugTests: XCTestCase {
 
     // MARK: - Thread Safety Tests
 
+    @MainActor
     func testPerformanceTrackerThreadSafety() {
         LuaDebugConfig.isEnabled = true
 
@@ -427,6 +427,7 @@ final class LuaDebugTests: XCTestCase {
         waitForExpectations(timeout: 5.0)
     }
 
+    @MainActor
     func testMemoryTrackerThreadSafety() {
         LuaDebugConfig.isEnabled = true
 

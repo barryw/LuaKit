@@ -16,27 +16,61 @@ public protocol LuaTypeConverter {
     static func convert(_ input: InputType) throws -> OutputType
 }
 
+private protocol AnyLuaTypeConverter: Sendable {
+    var converterType: Any.Type { get }
+    var inputType: Any.Type { get }
+    var outputType: Any.Type { get }
+
+    func convert(_ value: Any, converterName: String) throws -> Any
+}
+
+private struct LuaTypeConverterBox<Converter: LuaTypeConverter>: AnyLuaTypeConverter {
+    let converterType: Any.Type = Converter.self
+    let inputType: Any.Type = Converter.InputType.self
+    let outputType: Any.Type = Converter.OutputType.self
+
+    func convert(_ value: Any, converterName: String) throws -> Any {
+        guard let typedValue = value as? Converter.InputType else {
+            throw LuaError.invalidArgument(
+                "Converter '\(converterName)' expected \(Converter.InputType.self), got \(type(of: value))"
+            )
+        }
+
+        return try Converter.convert(typedValue)
+    }
+}
+
 /// Registry for custom type converters.
 ///
 /// Thread-safe for Swift 6 concurrency compliance.
 public final class LuaTypeConverterRegistry: @unchecked Sendable {
+    private struct Entry: Sendable {
+        let converter: any AnyLuaTypeConverter
+    }
+
     /// Thread-safe storage for converters
     private final class Storage: @unchecked Sendable {
-        private var converters: [String: Any] = [:]
+        private var converters: [String: Entry] = [:]
         private let lock = NSLock()
 
         static let shared = Storage()
 
-        func register(_ converter: Any, name: String) {
+        func register<T: LuaTypeConverter>(_ converter: T.Type, name: String) {
             lock.lock()
             defer { lock.unlock() }
-            converters[name] = converter
+            converters[name] = Entry(converter: LuaTypeConverterBox<T>())
         }
 
         func getConverter(named name: String) -> Any? {
             lock.lock()
             defer { lock.unlock() }
-            return converters[name]
+            return converters[name]?.converter.converterType
+        }
+
+        func getDispatcher(named name: String) -> (any AnyLuaTypeConverter)? {
+            lock.lock()
+            defer { lock.unlock() }
+            return converters[name]?.converter
         }
     }
 
@@ -48,6 +82,10 @@ public final class LuaTypeConverterRegistry: @unchecked Sendable {
     /// Get a converter by name
     public static func getConverter(named name: String) -> Any? {
         return Storage.shared.getConverter(named: name)
+    }
+
+    fileprivate static func getDispatcher(named name: String) -> (any AnyLuaTypeConverter)? {
+        return Storage.shared.getDispatcher(named: name)
     }
 }
 
@@ -111,7 +149,7 @@ extension Date: LuaConvertible {
         // Push as ISO8601 string
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        lua_pushstring(L, formatter.string(from: value))
+        luaPushString(L, formatter.string(from: value))
     }
 
     public static func pull(from L: OpaquePointer, at index: Int32) -> Date? {
@@ -127,7 +165,7 @@ extension Date: LuaConvertible {
 /// Make URL LuaConvertible
 extension URL: LuaConvertible {
     public static func push(_ value: URL, to L: OpaquePointer) {
-        lua_pushstring(L, value.absoluteString)
+        luaPushString(L, value.absoluteString)
     }
 
     public static func pull(from L: OpaquePointer, at index: Int32) -> URL? {
@@ -139,7 +177,7 @@ extension URL: LuaConvertible {
 /// Make UUID LuaConvertible
 extension UUID: LuaConvertible {
     public static func push(_ value: UUID, to L: OpaquePointer) {
-        lua_pushstring(L, value.uuidString)
+        luaPushString(L, value.uuidString)
     }
 
     public static func pull(from L: OpaquePointer, at index: Int32) -> UUID? {
@@ -151,7 +189,7 @@ extension UUID: LuaConvertible {
 /// Make Data LuaConvertible (as base64)
 extension Data: LuaConvertible {
     public static func push(_ value: Data, to L: OpaquePointer) {
-        lua_pushstring(L, value.base64EncodedString())
+        luaPushString(L, value.base64EncodedString())
     }
 
     public static func pull(from L: OpaquePointer, at index: Int32) -> Data? {
@@ -212,7 +250,8 @@ extension Dictionary: LuaConvertible where Key == String, Value: LuaConvertible 
         lua_pushnil(L) // First key
         while lua_next(L, tableIndex) != 0 {
             // Key is at index -2, value at index -1
-            if let key = String.pull(from: L, at: -2),
+            if lua_type(L, -2) == LUA_TSTRING,
+               let key = String.pull(from: L, at: -2),
                let value = Value.pull(from: L, at: -1) {
                 dict[key] = value
             }
@@ -229,19 +268,18 @@ extension Dictionary: LuaConvertible where Key == String, Value: LuaConvertible 
 public struct LuaConvert: Sendable {
     /// Convert a value using a registered converter
     public static func convert<T, U>(_ value: T, using converterName: String) throws -> U {
-        guard let converterType = LuaTypeConverterRegistry.getConverter(named: converterName) else {
+        guard let converter = LuaTypeConverterRegistry.getDispatcher(named: converterName) else {
             throw LuaError.invalidArgument("No converter registered with name '\(converterName)'")
         }
 
-        // This is a simplified version - in practice, we'd need more sophisticated type checking
-        if converterType is any LuaTypeConverter.Type {
-            // Dynamic dispatch would be needed here
-            throw LuaError.invalidArgument("Converter dispatch not yet implemented")
+        let converted = try converter.convert(value, converterName: converterName)
+        guard let typedResult = converted as? U else {
+            throw LuaError.invalidArgument(
+                "Converter '\(converterName)' returned \(type(of: converted)); expected \(U.self)"
+            )
         }
 
-        throw LuaError.invalidArgument(
-            "Invalid converter type: \(String(describing: type(of: converterType)))"
-        )
+        return typedResult
     }
 
     /// Try to convert between common types automatically

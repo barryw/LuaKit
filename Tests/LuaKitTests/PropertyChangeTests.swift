@@ -155,11 +155,11 @@ class PropertyChangeTests: XCTestCase {
         lua.register(DefaultBehaviorModel.self, as: "DefaultModel")
 
         // Create instance and modify property
-        let result = try lua.executeReturning("""
+        let result = try lua.execute("""
             model = DefaultModel.new("initial")
             model.text = "changed"
             return model.text
-        """, as: String.self)
+        """, returning: String.self)
 
         XCTAssertEqual(result, "changed", "Property should be changed with default implementation")
     }

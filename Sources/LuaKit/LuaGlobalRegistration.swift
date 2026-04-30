@@ -14,8 +14,10 @@ public extension LuaState {
 
     /// Register a global value with type safety
     func registerGlobal<T: LuaConvertible>(_ name: String, _ value: T) {
-        T.push(value, to: luaState)
-        lua_setglobal(luaState, name)
+        withLuaLock {
+            T.push(value, to: luaState)
+            lua_setglobal(luaState, name)
+        }
 
         if LuaDebugConfig.isEnabled {
             LuaDebugConfig.log("Registered global '\(name)' with value: \(value)", level: .info)
@@ -59,22 +61,24 @@ public extension LuaState {
 
     /// Register values under a namespace
     func registerInNamespace(_ namespace: String, name: String, value: Any) {
-        // Ensure namespace exists
-        let L = luaState
-        lua_getglobal(L, namespace)
+        withLuaLock {
+            // Ensure namespace exists
+            let L = luaState
+            lua_getglobal(L, namespace)
 
-        if lua_type(L, -1) != LUA_TTABLE {
-            lua_pop(L, 1)
-            // Create namespace if it doesn't exist
-            lua_createtable(L, 0, 0)
-            lua_pushvalue(L, -1) // Duplicate table reference
-            lua_setglobal(L, namespace)
+            if lua_type(L, -1) != LUA_TTABLE {
+                lua_pop(L, 1)
+                // Create namespace if it doesn't exist
+                lua_createtable(L, 0, 0)
+                lua_pushvalue(L, -1) // Duplicate table reference
+                lua_setglobal(L, namespace)
+            }
+
+            // Set value in namespace
+            pushValue(value, to: L)
+            lua_setfield(L, -2, name)
+            lua_pop(L, 1) // Pop namespace table
         }
-
-        // Set value in namespace
-        pushValue(value, to: L)
-        lua_setfield(L, -2, name)
-        lua_pop(L, 1) // Pop namespace table
 
         if LuaDebugConfig.isEnabled {
             LuaDebugConfig.log("Registered '\(name)' in namespace '\(namespace)'", level: .verbose)
@@ -91,9 +95,11 @@ public extension LuaState {
         returns: String? = nil,
         function: LuaFunction
     ) {
-        // Register the function
-        function.push(to: luaState)
-        lua_setglobal(luaState, name)
+        withLuaLock {
+            // Register the function
+            function.push(to: luaState)
+            lua_setglobal(luaState, name)
+        }
 
         // Store documentation metadata
         let docKey = "__luakit_doc_\(name)"
@@ -144,7 +150,7 @@ public extension LuaState {
         case let double as Double:
             lua_pushnumber(L, double)
         case let string as String:
-            lua_pushstring(L, string)
+            luaPushString(L, string)
         case let function as LuaFunction:
             function.push(to: L)
         case let bridgeable as LuaBridgeable:

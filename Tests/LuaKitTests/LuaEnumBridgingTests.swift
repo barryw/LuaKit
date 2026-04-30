@@ -10,14 +10,14 @@ import Lua
 import XCTest
 
 // Test enums
-enum Direction: String, CaseIterable, LuaEnumBridgeable {
+enum Direction: String, CaseIterable, LuaBridgeableEnum {
     case north
     case south
     case east
     case west
 }
 
-enum Status: String, CaseIterable, LuaEnumBridgeable {
+enum Status: String, CaseIterable, LuaBridgeableEnum {
     case pending
     case active
     case completed
@@ -43,7 +43,7 @@ final class LuaEnumBridgingTests: XCTestCase {
         super.tearDown()
     }
 
-    // MARK: - LuaEnumBridgeable Protocol Tests
+    // MARK: - LuaBridgeableEnum Protocol Tests
 
     func testEnumLuaTypeName() {
         // Default implementation uses type name
@@ -94,7 +94,7 @@ final class LuaEnumBridgingTests: XCTestCase {
     // MARK: - Enum Registration Tests
 
     func testRegisterEnum() {
-        lua.registerEnum(Direction.self)
+        lua.register(enum: Direction.self)
 
         // Check that enum table exists
         _ = try? lua.execute("""
@@ -117,20 +117,20 @@ final class LuaEnumBridgingTests: XCTestCase {
     }
 
     func testRegisterEnumWithCustomName() {
-        lua.registerEnum(Status.self, as: "CustomStatus")
+        lua.register(enum: Status.self, as: "CustomStatus")
 
         // Check that enum is registered with custom name
         _ = try? lua.execute("customStatusType = type(CustomStatus) == 'table'")
         XCTAssertEqual(lua.globals["customStatusType"] as? Bool, true)
 
         // Check that default name uses luaTypeName
-        lua.registerEnum(Status.self)
+        lua.register(enum: Status.self)
         _ = try? lua.execute("gameStatusType = type(GameStatus) == 'table'")
         XCTAssertEqual(lua.globals["gameStatusType"] as? Bool, true)
     }
 
     func testEnumValidationFunction() {
-        lua.registerEnum(Direction.self)
+        lua.register(enum: Direction.self)
 
         // Test validation function
         _ = try? lua.execute("""
@@ -145,7 +145,7 @@ final class LuaEnumBridgingTests: XCTestCase {
     }
 
     func testEnumConversionFunction() {
-        lua.registerEnum(Direction.self)
+        lua.register(enum: Direction.self)
 
         // Test conversion function
         _ = try? lua.execute("""
@@ -210,7 +210,7 @@ final class LuaEnumBridgingTests: XCTestCase {
     // MARK: - Integration Tests
 
     func testEnumInLuaScript() {
-        lua.registerEnum(Direction.self)
+        lua.register(enum: Direction.self)
 
         let script = """
             function move(direction)
@@ -234,12 +234,6 @@ final class LuaEnumBridgingTests: XCTestCase {
         XCTAssertEqual(lua.globals["result"] as? String, "Moving north")
     }
 
-    func testEnumWithBridgeableClass() {
-        // For now, skip this test as it requires macro expansion
-        // which has issues with enum properties
-        XCTSkip("Skipping due to @LuaBridgeable macro limitations with enum properties")
-    }
-
     func testRegisterMultipleEnums() {
         // Note: registerEnums has limitations in the implementation
         // Testing what we can
@@ -254,7 +248,7 @@ final class LuaEnumBridgingTests: XCTestCase {
     }
 
     func testEnumErrorHandling() {
-        lua.registerEnum(Direction.self)
+        lua.register(enum: Direction.self)
 
         // Test that accessing invalid enum value doesn't crash
         let script = """

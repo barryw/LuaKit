@@ -41,23 +41,27 @@ public final class LuaCallback: @unchecked Sendable {
     ///   - stackIndex: The index of the function on the stack (default: -1, top of stack).
     /// - Throws: `LuaError.typeMismatch` if the value is not a function.
     public init(from state: LuaState, stackIndex: Int32 = -1) throws {
-        let luaPointer = state.luaState
+        let reference = try state.withLuaLock {
+            let luaPointer = state.luaState
 
-        guard lua_type(luaPointer, stackIndex) == LUA_TFUNCTION else {
-            let actualType = String(cString: lua_typename(luaPointer, lua_type(luaPointer, stackIndex)))
-            throw LuaError.typeMismatch(
-                expected: "function",
-                actual: actualType,
-                context: "Creating LuaCallback"
-            )
+            guard lua_type(luaPointer, stackIndex) == LUA_TFUNCTION else {
+                let actualType = String(cString: lua_typename(luaPointer, lua_type(luaPointer, stackIndex)))
+                throw LuaError.typeMismatch(
+                    expected: "function",
+                    actual: actualType,
+                    context: "Creating LuaCallback"
+                )
+            }
+
+            // Push the function to the top if it's not already there
+            if stackIndex != -1 {
+                lua_pushvalue(luaPointer, stackIndex)
+            }
+
+            return luaL_ref(luaPointer, luaRegistryIndex)
         }
 
-        // Push the function to the top if it's not already there
-        if stackIndex != -1 {
-            lua_pushvalue(luaPointer, stackIndex)
-        }
-
-        self.reference = luaL_ref(luaPointer, luaRegistryIndex)
+        self.reference = reference
         self.luaState = state
     }
 
@@ -69,21 +73,26 @@ public final class LuaCallback: @unchecked Sendable {
             throw LuaError.stateInvalid
         }
 
-        let luaPointer = state.luaState
+        let reference = state.withLuaLock {
+            let luaPointer = state.luaState
+            // Push the callable's function onto the stack
+            callable.pushFunction()
+            return luaL_ref(luaPointer, luaRegistryIndex)
+        }
 
-        // Push the callable's function onto the stack
-        callable.pushFunction()
-
-        self.reference = luaL_ref(luaPointer, luaRegistryIndex)
+        self.reference = reference
         self.luaState = state
     }
 
     deinit {
         lock.lock()
-        defer { lock.unlock() }
+        let state = luaState
+        lock.unlock()
 
-        if let luaState = luaState {
-            luaL_unref(luaState.luaState, luaRegistryIndex, reference)
+        if let state {
+            state.withLuaLock {
+                luaL_unref(state.luaState, luaRegistryIndex, reference)
+            }
         }
     }
 
@@ -108,8 +117,7 @@ public final class LuaCallback: @unchecked Sendable {
     }
 
     private func extractError(from luaPointer: OpaquePointer) -> LuaError {
-        if let errorStr = lua_tolstring(luaPointer, -1, nil) {
-            let error = String(cString: errorStr)
+        if let error = luaString(luaPointer, at: -1) {
             lua_pop(luaPointer, 1)
             return .runtime(error)
         }
@@ -127,6 +135,53 @@ public final class LuaCallback: @unchecked Sendable {
         return result
     }
 
+    private func validState() throws -> LuaState {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard let state = luaState else {
+            throw LuaError.stateInvalid
+        }
+
+        return state
+    }
+
+    private func callReturning<R: LuaConvertible>(
+        argumentCount: Int32,
+        pushArguments: (OpaquePointer) -> Void
+    ) throws -> R {
+        let state = try validState()
+
+        return try state.withLuaLock {
+            let luaPointer = state.luaState
+            pushFunction(to: luaPointer)
+            pushArguments(luaPointer)
+
+            if state.protectedCall(argumentCount: argumentCount, resultCount: 1) != LUA_OK {
+                throw extractError(from: luaPointer)
+            }
+
+            return try pullResult(from: luaPointer)
+        }
+    }
+
+    private func callDiscardingResult(
+        argumentCount: Int32,
+        pushArguments: (OpaquePointer) -> Void
+    ) throws {
+        let state = try validState()
+
+        try state.withLuaLock {
+            let luaPointer = state.luaState
+            pushFunction(to: luaPointer)
+            pushArguments(luaPointer)
+
+            if state.protectedCall(argumentCount: argumentCount, resultCount: 0) != LUA_OK {
+                throw extractError(from: luaPointer)
+            }
+        }
+    }
+
     // MARK: - Call with Return Value
 
     /// Calls the Lua callback with no arguments and returns a value.
@@ -134,41 +189,14 @@ public final class LuaCallback: @unchecked Sendable {
     /// - Returns: The return value converted to the specified type.
     /// - Throws: If the Lua state is invalid or the call fails.
     public func call<R: LuaConvertible>() throws -> R {
-        lock.lock()
-        guard let state = luaState else {
-            lock.unlock()
-            throw LuaError.stateInvalid
-        }
-        lock.unlock()
-
-        let luaPointer = state.luaState
-        pushFunction(to: luaPointer)
-
-        if lua_pcall(luaPointer, 0, 1, 0) != LUA_OK {
-            throw extractError(from: luaPointer)
-        }
-
-        return try pullResult(from: luaPointer)
+        try callReturning(argumentCount: 0) { _ in }
     }
 
     /// Calls the Lua callback with one argument and returns a value.
     public func call<T1: LuaConvertible, R: LuaConvertible>(_ arg1: T1) throws -> R {
-        lock.lock()
-        guard let state = luaState else {
-            lock.unlock()
-            throw LuaError.stateInvalid
+        try callReturning(argumentCount: 1) { luaPointer in
+            T1.push(arg1, to: luaPointer)
         }
-        lock.unlock()
-
-        let luaPointer = state.luaState
-        pushFunction(to: luaPointer)
-        T1.push(arg1, to: luaPointer)
-
-        if lua_pcall(luaPointer, 1, 1, 0) != LUA_OK {
-            throw extractError(from: luaPointer)
-        }
-
-        return try pullResult(from: luaPointer)
     }
 
     /// Calls the Lua callback with two arguments and returns a value.
@@ -176,23 +204,10 @@ public final class LuaCallback: @unchecked Sendable {
         _ arg1: T1,
         _ arg2: T2
     ) throws -> R {
-        lock.lock()
-        guard let state = luaState else {
-            lock.unlock()
-            throw LuaError.stateInvalid
+        try callReturning(argumentCount: 2) { luaPointer in
+            T1.push(arg1, to: luaPointer)
+            T2.push(arg2, to: luaPointer)
         }
-        lock.unlock()
-
-        let luaPointer = state.luaState
-        pushFunction(to: luaPointer)
-        T1.push(arg1, to: luaPointer)
-        T2.push(arg2, to: luaPointer)
-
-        if lua_pcall(luaPointer, 2, 1, 0) != LUA_OK {
-            throw extractError(from: luaPointer)
-        }
-
-        return try pullResult(from: luaPointer)
     }
 
     /// Calls the Lua callback with three arguments and returns a value.
@@ -201,24 +216,11 @@ public final class LuaCallback: @unchecked Sendable {
         _ arg2: T2,
         _ arg3: T3
     ) throws -> R {
-        lock.lock()
-        guard let state = luaState else {
-            lock.unlock()
-            throw LuaError.stateInvalid
+        try callReturning(argumentCount: 3) { luaPointer in
+            T1.push(arg1, to: luaPointer)
+            T2.push(arg2, to: luaPointer)
+            T3.push(arg3, to: luaPointer)
         }
-        lock.unlock()
-
-        let luaPointer = state.luaState
-        pushFunction(to: luaPointer)
-        T1.push(arg1, to: luaPointer)
-        T2.push(arg2, to: luaPointer)
-        T3.push(arg3, to: luaPointer)
-
-        if lua_pcall(luaPointer, 3, 1, 0) != LUA_OK {
-            throw extractError(from: luaPointer)
-        }
-
-        return try pullResult(from: luaPointer)
     }
 
     // MARK: - Call Void (No Return Value)
@@ -227,55 +229,21 @@ public final class LuaCallback: @unchecked Sendable {
     ///
     /// - Throws: If the Lua state is invalid or the call fails.
     public func callVoid() throws {
-        lock.lock()
-        guard let state = luaState else {
-            lock.unlock()
-            throw LuaError.stateInvalid
-        }
-        lock.unlock()
-
-        let luaPointer = state.luaState
-        pushFunction(to: luaPointer)
-
-        if lua_pcall(luaPointer, 0, 0, 0) != LUA_OK {
-            throw extractError(from: luaPointer)
-        }
+        try callDiscardingResult(argumentCount: 0) { _ in }
     }
 
     /// Calls the Lua callback with one argument, ignoring the return value.
     public func callVoid<T1: LuaConvertible>(_ arg1: T1) throws {
-        lock.lock()
-        guard let state = luaState else {
-            lock.unlock()
-            throw LuaError.stateInvalid
-        }
-        lock.unlock()
-
-        let luaPointer = state.luaState
-        pushFunction(to: luaPointer)
-        T1.push(arg1, to: luaPointer)
-
-        if lua_pcall(luaPointer, 1, 0, 0) != LUA_OK {
-            throw extractError(from: luaPointer)
+        try callDiscardingResult(argumentCount: 1) { luaPointer in
+            T1.push(arg1, to: luaPointer)
         }
     }
 
     /// Calls the Lua callback with two arguments, ignoring the return value.
     public func callVoid<T1: LuaConvertible, T2: LuaConvertible>(_ arg1: T1, _ arg2: T2) throws {
-        lock.lock()
-        guard let state = luaState else {
-            lock.unlock()
-            throw LuaError.stateInvalid
-        }
-        lock.unlock()
-
-        let luaPointer = state.luaState
-        pushFunction(to: luaPointer)
-        T1.push(arg1, to: luaPointer)
-        T2.push(arg2, to: luaPointer)
-
-        if lua_pcall(luaPointer, 2, 0, 0) != LUA_OK {
-            throw extractError(from: luaPointer)
+        try callDiscardingResult(argumentCount: 2) { luaPointer in
+            T1.push(arg1, to: luaPointer)
+            T2.push(arg2, to: luaPointer)
         }
     }
 
@@ -285,21 +253,10 @@ public final class LuaCallback: @unchecked Sendable {
         _ arg2: T2,
         _ arg3: T3
     ) throws {
-        lock.lock()
-        guard let state = luaState else {
-            lock.unlock()
-            throw LuaError.stateInvalid
-        }
-        lock.unlock()
-
-        let luaPointer = state.luaState
-        pushFunction(to: luaPointer)
-        T1.push(arg1, to: luaPointer)
-        T2.push(arg2, to: luaPointer)
-        T3.push(arg3, to: luaPointer)
-
-        if lua_pcall(luaPointer, 3, 0, 0) != LUA_OK {
-            throw extractError(from: luaPointer)
+        try callDiscardingResult(argumentCount: 3) { luaPointer in
+            T1.push(arg1, to: luaPointer)
+            T2.push(arg2, to: luaPointer)
+            T3.push(arg3, to: luaPointer)
         }
     }
 
@@ -310,22 +267,11 @@ public final class LuaCallback: @unchecked Sendable {
         _ arg3: T3,
         _ arg4: T4
     ) throws {
-        lock.lock()
-        guard let state = luaState else {
-            lock.unlock()
-            throw LuaError.stateInvalid
-        }
-        lock.unlock()
-
-        let luaPointer = state.luaState
-        pushFunction(to: luaPointer)
-        T1.push(arg1, to: luaPointer)
-        T2.push(arg2, to: luaPointer)
-        T3.push(arg3, to: luaPointer)
-        T4.push(arg4, to: luaPointer)
-
-        if lua_pcall(luaPointer, 4, 0, 0) != LUA_OK {
-            throw extractError(from: luaPointer)
+        try callDiscardingResult(argumentCount: 4) { luaPointer in
+            T1.push(arg1, to: luaPointer)
+            T2.push(arg2, to: luaPointer)
+            T3.push(arg3, to: luaPointer)
+            T4.push(arg4, to: luaPointer)
         }
     }
 }
@@ -347,14 +293,16 @@ public extension LuaState {
     /// - Returns: A `LuaCallback` wrapping the function.
     /// - Throws: `LuaError.functionNotFound` if the global is not a function.
     func getCallback(_ name: String) throws -> LuaCallback {
-        lua_getglobal(luaState, name)
+        try withLuaLock {
+            lua_getglobal(luaState, name)
 
-        guard lua_type(luaState, -1) == LUA_TFUNCTION else {
-            let actualType = String(cString: lua_typename(luaState, lua_type(luaState, -1)))
-            lua_pop(luaState, 1)
-            throw LuaError.functionNotFound("Global '\(name)' is not a function (got \(actualType))")
+            guard lua_type(luaState, -1) == LUA_TFUNCTION else {
+                let actualType = String(cString: lua_typename(luaState, lua_type(luaState, -1)))
+                lua_pop(luaState, 1)
+                throw LuaError.functionNotFound("Global '\(name)' is not a function (got \(actualType))")
+            }
+
+            return try LuaCallback(from: self)
         }
-
-        return try LuaCallback(from: self)
     }
 }

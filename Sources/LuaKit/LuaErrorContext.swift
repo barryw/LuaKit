@@ -144,11 +144,10 @@ public extension OpaquePointer {
         guard lua_getmetatable(self, index) != 0 else { return nil }
         defer { lua_pop(self, 1) } // Pop metatable
 
-        lua_pushstring(self, "__name")
+        luaPushString(self, "__name")
         lua_rawget(self, -2)
 
-        if let name = lua_tostring(self, -1) {
-            let result = String(cString: name)
+        if let result = luaString(self, at: -1) {
             lua_pop(self, 1) // Pop name
             return result
         }
@@ -172,8 +171,8 @@ public extension OpaquePointer {
                 return String(lua_tonumber(self, index))
             }
         case LUA_TSTRING:
-            if let str = lua_tostring(self, index) {
-                return "\"\(String(cString: str))\""
+            if let str = luaString(self, at: index) {
+                return "\"\(str)\""
             }
             return "string"
         case LUA_TTABLE:
@@ -203,17 +202,25 @@ public func luaDetailedError(
         return "unknown"
     }()
 
-    let context = LuaErrorContext(
-        functionName: functionName,
-        argumentIndex: argumentIndex,
-        expectedType: expectedType,
-        actualType: resolvedActualType,
-        additionalInfo: additionalInfo,
-        hint: hint
-    )
+    var message = "Error"
+    if let index = argumentIndex {
+        message += ": Invalid argument #\(index) to '\(functionName)'"
+    } else {
+        message += " in '\(functionName)'"
+    }
 
-    lua_pushstring(L, context.generateMessage())
-    return lua_error(L)
+    message += "\nExpected: \(expectedType)"
+    message += "\nGot: \(resolvedActualType)"
+
+    if let additionalInfo {
+        message += "\n\(additionalInfo)"
+    }
+
+    if let hint {
+        message += "\n\nHint: \(hint)"
+    }
+
+    return luaError(L, message)
 }
 
 /// Type validation helper

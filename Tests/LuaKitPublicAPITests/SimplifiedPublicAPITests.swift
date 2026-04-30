@@ -22,7 +22,7 @@ final class SimplifiedPublicAPITests: XCTestCase {
         _ = try lua.execute("x = 10")
 
         // Test execution with return value
-        let result = try lua.executeReturning("return 42", as: Int.self)
+        let result = try lua.execute("return 42", returning: Int.self)
         XCTAssertEqual(result, 42)
     }
 
@@ -30,7 +30,7 @@ final class SimplifiedPublicAPITests: XCTestCase {
         let lua = try LuaState()
 
         var capturedOutput = ""
-        lua.setPrintHandler { output in
+        lua.onPrint { output in
             capturedOutput = output
         }
 
@@ -44,16 +44,16 @@ final class SimplifiedPublicAPITests: XCTestCase {
         let lua = try LuaState()
 
         // Test different return types
-        let intResult = try lua.executeReturning("return 42", as: Int.self)
+        let intResult = try lua.execute("return 42", returning: Int.self)
         XCTAssertEqual(intResult, 42)
 
-        let doubleResult = try lua.executeReturning("return 3.14", as: Double.self)
+        let doubleResult = try lua.execute("return 3.14", returning: Double.self)
         XCTAssertEqual(doubleResult, 3.14, accuracy: 0.001)
 
-        let stringResult = try lua.executeReturning("return 'test'", as: String.self)
+        let stringResult = try lua.execute("return 'test'", returning: String.self)
         XCTAssertEqual(stringResult, "test")
 
-        let boolResult = try lua.executeReturning("return true", as: Bool.self)
+        let boolResult = try lua.execute("return true", returning: Bool.self)
         XCTAssertEqual(boolResult, true)
     }
 
@@ -68,13 +68,13 @@ final class SimplifiedPublicAPITests: XCTestCase {
         lua.globals["testBool"] = true
 
         // Verify from Lua
-        let number = try lua.executeReturning("return testNumber", as: Int.self)
+        let number = try lua.execute("return testNumber", returning: Int.self)
         XCTAssertEqual(number, 123)
 
-        let string = try lua.executeReturning("return testString", as: String.self)
+        let string = try lua.execute("return testString", returning: String.self)
         XCTAssertEqual(string, "hello")
 
-        let bool = try lua.executeReturning("return testBool", as: Bool.self)
+        let bool = try lua.execute("return testBool", returning: Bool.self)
         XCTAssertEqual(bool, true)
 
         // Test getting globals
@@ -96,14 +96,14 @@ final class SimplifiedPublicAPITests: XCTestCase {
         _ = try lua.execute("numbers = {10, 20, 30, 40, 50}")
 
         // Verify array length from Lua
-        let length = try lua.executeReturning("return #numbers", as: Int.self)
+        let length = try lua.execute("return #numbers", returning: Int.self)
         XCTAssertEqual(length, 5)
 
         // Verify array elements (Lua arrays are 1-indexed)
-        let first = try lua.executeReturning("return numbers[1]", as: Int.self)
+        let first = try lua.execute("return numbers[1]", returning: Int.self)
         XCTAssertEqual(first, 10)
 
-        let last = try lua.executeReturning("return numbers[5]", as: Int.self)
+        let last = try lua.execute("return numbers[5]", returning: Int.self)
         XCTAssertEqual(last, 50)
     }
 
@@ -166,13 +166,13 @@ final class SimplifiedPublicAPITests: XCTestCase {
         """)
 
         // Access table values from Lua
-        let host = try lua.executeReturning("return config.host", as: String.self)
+        let host = try lua.execute("return config.host", returning: String.self)
         XCTAssertEqual(host, "localhost")
 
-        let port = try lua.executeReturning("return config.port", as: Int.self)
+        let port = try lua.execute("return config.port", returning: Int.self)
         XCTAssertEqual(port, 8_080)
 
-        let secure = try lua.executeReturning("return config.secure", as: Bool.self)
+        let secure = try lua.execute("return config.secure", returning: Bool.self)
         XCTAssertEqual(secure, true)
 
         // Test the createTable method if it's public

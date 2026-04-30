@@ -34,16 +34,12 @@ public struct EnhancedLuaBridgeableMacro: MemberMacro, ExtensionMacro {
 
         // Handle array types
         if returnType.hasPrefix("[") && returnType.hasSuffix("]") {
-            let elementType = String(returnType.dropFirst().dropLast())
-            if ["String", "Int", "Double", "Bool"].contains(elementType) {
-                return "\(elementType).push(result, to: L)"
-            }
-            return "// TODO: Handle array of \(elementType)"
+            return "\(returnType).push(result, to: L)"
         }
 
         // Handle dictionary types
         if returnType.hasPrefix("[") && returnType.contains(":") {
-            return "// TODO: Handle dictionary type \(returnType)"
+            return "\(returnType).push(result, to: L)"
         }
 
         // Handle basic types
@@ -59,7 +55,7 @@ public struct EnhancedLuaBridgeableMacro: MemberMacro, ExtensionMacro {
         case "Float":
             return "lua_pushnumber(L, lua_Number(result))"
         case "String":
-            return "lua_pushstring(L, result)"
+            return "luaPushString(L, result)"
         case "Bool":
             return "lua_pushboolean(L, result ? 1 : 0)"
         case "Date":
@@ -106,7 +102,7 @@ public struct EnhancedLuaBridgeableMacro: MemberMacro, ExtensionMacro {
         var codeLines: [String] = []
 
         // Method registration
-        codeLines.append("lua_pushstring(L, \"\(methodName)\")")
+        codeLines.append("luaPushString(L, \"\(methodName)\")")
         codeLines.append("lua_pushcclosure(L, { L in")
         codeLines.append("    guard let L = L else { return 0 }")
 

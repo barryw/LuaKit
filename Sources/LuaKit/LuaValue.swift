@@ -27,11 +27,11 @@ public enum LuaValue: Equatable, Hashable {
         case .number(let value):
             lua_pushnumber(L, value)
         case .string(let value):
-            lua_pushstring(L, value)
+            luaPushString(L, value)
         case .table(let dict):
             lua_createtable(L, 0, Int32(dict.count))
             for (key, value) in dict {
-                lua_pushstring(L, key)
+                luaPushString(L, key)
                 value.push(to: L)
                 lua_settable(L, -3)
             }
@@ -70,18 +70,20 @@ public enum LuaValue: Equatable, Hashable {
     }
 
     private static func pullString(from L: OpaquePointer, at index: Int32) -> LuaValue? {
-        guard let cStr = lua_tolstring(L, index, nil) else { return nil }
-        return .string(String(cString: cStr))
+        guard let string = luaString(L, at: index) else { return nil }
+        return .string(string)
     }
 
     private static func pullTable(from L: OpaquePointer, at index: Int32) -> LuaValue? {
         var table: [String: LuaValue] = [:]
+        let tableIndex = lua_absindex(L, index)
 
         lua_pushnil(L)
-        while lua_next(L, index - 1) != 0 {
-            if let keyStr = lua_tolstring(L, -2, nil),
+        while lua_next(L, tableIndex) != 0 {
+            if lua_type(L, -2) == LUA_TSTRING,
+               let keyStr = luaString(L, at: -2),
                let value = LuaValue.pull(from: L, at: -1) {
-                table[String(cString: keyStr)] = value
+                table[keyStr] = value
             }
             lua_settop(L, -2)
         }

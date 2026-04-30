@@ -284,21 +284,37 @@ final class LuaCallbackTests: XCTestCase {
     }
 
     func testIsValidAfterStateDealloc() throws {
-        // Skip: Swift ARC doesn't guarantee deterministic deallocation timing,
-        // making this test inherently unreliable. The weak reference pattern
-        // works correctly, but we can't reliably test when the LuaState is freed.
-        //
-        // The implementation correctly uses a weak reference to LuaState,
-        // which will become nil when the state is deallocated. The isValid
-        // property and state accessor properly check this weak reference.
-        throw XCTSkip("Cannot reliably test deallocation timing with Swift ARC")
+        weak var weakState: LuaState?
+        var callback: LuaCallback?
+
+        autoreleasepool {
+            let state = try? LuaState()
+            weakState = state
+            _ = try? state?.execute("function testCallback() return 42 end")
+            callback = try? state?.getCallback("testCallback")
+        }
+
+        XCTAssertNil(weakState)
+        XCTAssertNotNil(callback)
+        XCTAssertFalse(callback!.isValid)
+        XCTAssertNil(callback!.state)
     }
 
     func testCallAfterStateDealloc() throws {
-        // Skip: Same issue as testIsValidAfterStateDealloc.
-        // The implementation correctly throws LuaError.stateInvalid when
-        // the weak reference to LuaState is nil.
-        throw XCTSkip("Cannot reliably test deallocation timing with Swift ARC")
+        var callback: LuaCallback?
+
+        autoreleasepool {
+            let state = try? LuaState()
+            _ = try? state?.execute("function testCallback() return 42 end")
+            callback = try? state?.getCallback("testCallback")
+        }
+
+        XCTAssertNotNil(callback)
+        XCTAssertThrowsError(try callback!.call() as Int) { error in
+            guard case LuaError.stateInvalid = error else {
+                return XCTFail("Expected LuaError.stateInvalid, got \(error)")
+            }
+        }
     }
 
     // MARK: - Multiple Callback Tests
@@ -332,14 +348,11 @@ final class LuaCallbackTests: XCTestCase {
             end
         """)
 
-        // Get the factory function
-        let factory = try lua.getFunction("createHandler")
-
         // Create a handler with multiplier 10
         // Push the result onto the stack
         lua_getglobal(lua.luaState, "createHandler")
         lua_pushinteger(lua.luaState, 10)
-        lua_pcall(lua.luaState, 1, 1, 0)
+        XCTAssertEqual(lua_pcall(lua.luaState, 1, 1, 0), LUA_OK)
 
         // Create callback from the returned function
         let handler = try lua.createCallback()

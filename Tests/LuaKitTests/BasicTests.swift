@@ -18,7 +18,7 @@ final class BasicTests: XCTestCase {
         let lua = try LuaState()
 
         var output = ""
-        lua.setPrintHandler { text in
+        lua.onPrint { text in
             output += text
         }
 
@@ -29,16 +29,16 @@ final class BasicTests: XCTestCase {
     func testReturnValues() throws {
         let lua = try LuaState()
 
-        let intResult = try lua.executeReturning("return 42", as: Int.self)
+        let intResult = try lua.execute("return 42", returning: Int.self)
         XCTAssertEqual(intResult, 42)
 
-        let doubleResult = try lua.executeReturning("return 3.14", as: Double.self)
+        let doubleResult = try lua.execute("return 3.14", returning: Double.self)
         XCTAssertEqual(doubleResult, 3.14, accuracy: 0.001)
 
-        let stringResult = try lua.executeReturning("return 'Hello'", as: String.self)
+        let stringResult = try lua.execute("return 'Hello'", returning: String.self)
         XCTAssertEqual(stringResult, "Hello")
 
-        let boolResult = try lua.executeReturning("return true", as: Bool.self)
+        let boolResult = try lua.execute("return true", returning: Bool.self)
         XCTAssertEqual(boolResult, true)
     }
 
@@ -68,7 +68,7 @@ final class BasicTests: XCTestCase {
     func testTypeMismatch() throws {
         let lua = try LuaState()
 
-        XCTAssertThrowsError(try lua.executeReturning("return 'not a number'", as: Int.self)) { error in
+        XCTAssertThrowsError(try lua.execute("return 'not a number'", returning: Int.self)) { error in
             guard case LuaError.typeMismatch = error else {
                 XCTFail("Expected type mismatch error")
                 return
@@ -84,7 +84,7 @@ final class BasicTests: XCTestCase {
         _ = try lua.execute("print('Hello from Lua!')")
 
         // Get values from Lua
-        let result = try lua.executeReturning("return 2 + 2", as: Int.self)
+        let result = try lua.execute("return 2 + 2", returning: Int.self)
         XCTAssertEqual(result, 4)
     }
 

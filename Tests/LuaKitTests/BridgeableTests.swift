@@ -239,7 +239,7 @@ final class BridgeableTests: XCTestCase {
         lua.register(TestPerson.self, as: "Person")
 
         var output = ""
-        lua.setPrintHandler { text in
+        lua.onPrint { text in
             output += text
         }
 
@@ -291,7 +291,7 @@ final class BridgeableTests: XCTestCase {
         lua.register(TestCalculator.self, as: "Calculator")
 
         var output = ""
-        lua.setPrintHandler { text in
+        lua.onPrint { text in
             output += text
         }
 
@@ -313,7 +313,7 @@ final class BridgeableTests: XCTestCase {
         lua.register(TestPerson.self, as: "Person")
 
         var output = ""
-        lua.setPrintHandler { text in
+        lua.onPrint { text in
             output += text
         }
 

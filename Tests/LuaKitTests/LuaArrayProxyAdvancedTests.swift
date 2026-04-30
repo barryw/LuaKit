@@ -238,7 +238,23 @@ final class LuaArrayProxyAdvancedTests: XCTestCase {
     // MARK: - Append Tests
 
     func testArrayProxyAppend() throws {
-        throw XCTSkip("Array proxy append test causes segmentation faults in CI")
+        let proxy = LuaStringArrayProxy(
+            owner: owner,
+            propertyName: "strings",
+            getter: { self.owner.strings },
+            setter: { self.owner.strings = $0 }
+        )
+
+        LuaStringArrayProxy.push(proxy, to: lua.luaState)
+        lua_setglobal(lua.luaState, "array")
+
+        try lua.execute("""
+            array[4] = "d"
+            assert(array[4] == "d")
+            assert(#array == 4)
+        """)
+
+        XCTAssertEqual(owner.strings, ["a", "b", "c", "d"])
     }
 
     // MARK: - Property Change Notification Tests

@@ -50,34 +50,36 @@ extension LuaBridgeable {
     }
 
     public static func register(in state: LuaState, as name: String) {
-        let L = state.luaState
+        state.withLuaLock {
+            let L = state.luaState
 
-        luaL_newmetatable(L, metaTableName)
+            luaL_newmetatable(L, metaTableName)
 
-        lua_pushstring(L, "__index")
-        lua_pushvalue(L, -2)
-        lua_settable(L, -3)
+            luaPushString(L, "__index")
+            lua_pushvalue(L, -2)
+            lua_settable(L, -3)
 
-        registerMethods(L)
+            registerMethods(L)
 
-        lua_pushstring(L, "__gc")
-        lua_pushcclosure(L, { L in
-            guard let L = L else { return 0 }
-            if let userdata = lua_touserdata(L, 1) {
-                userdata.assumingMemoryBound(to: AnyObject.self).deinitialize(count: 1)
-            }
-            return 0
-        }, 0)
-        lua_settable(L, -3)
+            luaPushString(L, "__gc")
+            lua_pushcclosure(L, { L in
+                guard let L = L else { return 0 }
+                if let userdata = lua_touserdata(L, 1) {
+                    userdata.assumingMemoryBound(to: Optional<AnyObject>.self).pointee = nil
+                }
+                return 0
+            }, 0)
+            lua_settable(L, -3)
 
-        lua_settop(L, -2)
+            lua_settop(L, -2)
 
-        registerConstructor(L, name: name)
+            registerConstructor(L, name: name)
+        }
     }
 
     public static func push(_ object: Self, to L: OpaquePointer) {
-        let userdata = lua_newuserdatauv(L, MemoryLayout<AnyObject>.size, 0)
-        userdata?.assumingMemoryBound(to: AnyObject.self).initialize(to: object)
+        let userdata = lua_newuserdatauv(L, MemoryLayout<AnyObject?>.size, 0)
+        userdata?.assumingMemoryBound(to: Optional<AnyObject>.self).initialize(to: object)
 
         lua_getfield(L, luaRegistryIndex, metaTableName)
         lua_setmetatable(L, -2)
@@ -97,7 +99,9 @@ extension LuaBridgeable {
             return nil
         }
 
-        let object = userdata.assumingMemoryBound(to: AnyObject.self).pointee
+        guard let object = userdata.assumingMemoryBound(to: Optional<AnyObject>.self).pointee else {
+            return nil
+        }
         return object as? Self
     }
 }
@@ -114,7 +118,7 @@ public struct LuaMethod {
 
 public func registerLuaMethods(_ L: OpaquePointer, methods: [LuaMethod]) {
     for method in methods {
-        lua_pushstring(L, method.name)
+        luaPushString(L, method.name)
         lua_pushcclosure(L, method.function, 0)
         lua_settable(L, -3)
     }

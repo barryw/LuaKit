@@ -225,7 +225,7 @@ final class LuaArrayProxyCoverageTests: XCTestCase {
         """)
 
         // Should return nil or empty string for invalid properties
-        XCTAssertTrue(result == nil || (result as? String)?.isEmpty == true || result as? String == "nil")
+        XCTAssertTrue(result == nil || result?.isEmpty == true || result == "nil")
     }
 
     func testArrayProxyInvalidMethodCall() {

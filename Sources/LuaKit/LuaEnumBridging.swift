@@ -39,7 +39,7 @@ extension LuaBridgeableEnum {
 /// Extension to make LuaBridgeableEnum types LuaConvertible
 extension LuaBridgeableEnum {
     public static func push(_ value: Self, to L: OpaquePointer) {
-        lua_pushstring(L, value.rawValue)
+        luaPushString(L, value.rawValue)
     }
 
     public static func pull(from L: OpaquePointer, at index: Int32) -> Self? {
@@ -80,7 +80,7 @@ extension LuaState {
 
         // Add all cases
         for enumCase in enumType.allCases {
-            lua_pushstring(L, enumCase.rawValue)
+            luaPushString(L, enumCase.rawValue)
             lua_setfield(L, -2, enumCase.rawValue)
         }
 

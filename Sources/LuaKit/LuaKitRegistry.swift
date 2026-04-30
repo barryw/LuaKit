@@ -177,24 +177,33 @@ public final class LuaClosureStorage: @unchecked Sendable {
 
     /// Retains a LuaFunction to prevent deallocation while Lua holds a reference
     public func retainFunction(_ function: LuaFunction, id: Int) {
+        let replacedFunction: LuaFunction?
         lock.lock()
-        defer { lock.unlock() }
-        retainedFunctions[id] = function
+        replacedFunction = retainedFunctions.updateValue(function, forKey: id)
+        lock.unlock()
+
+        _ = replacedFunction
     }
 
     /// Releases a retained LuaFunction
     public func releaseFunction(id: Int) {
+        let removedFunction: LuaFunction?
         lock.lock()
-        defer { lock.unlock() }
-        retainedFunctions.removeValue(forKey: id)
+        removedFunction = retainedFunctions.removeValue(forKey: id)
+        lock.unlock()
+
+        _ = removedFunction
     }
 
     /// Removes both closure and retained function for an ID (used in deinit)
     public func removeAll(id: Int) {
+        let removedFunction: LuaFunction?
         lock.lock()
-        defer { lock.unlock() }
         closures.removeValue(forKey: id)
-        retainedFunctions.removeValue(forKey: id)
+        removedFunction = retainedFunctions.removeValue(forKey: id)
+        lock.unlock()
+
+        _ = removedFunction
     }
 }
 

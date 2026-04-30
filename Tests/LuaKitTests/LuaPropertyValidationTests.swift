@@ -198,7 +198,7 @@ final class LuaPropertyValidationTests: XCTestCase {
 
     // MARK: - LuaEnumPropertyValidator Tests
 
-    enum TestStatus: String, CaseIterable, LuaEnumBridgeable {
+    enum TestStatus: String, CaseIterable, LuaBridgeableEnum {
         case active
         case inactive
         case pending

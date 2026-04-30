@@ -281,7 +281,7 @@ final class LuaFunctionTests: XCTestCase {
     // MARK: - Lua Integration Tests
 
     func testRegisterFunction() {
-        lua.registerFunction("multiply") { (a: Double, b: Double) -> Double in
+        lua.register(function: "multiply") { (a: Double, b: Double) -> Double in
             return a * b
         }
 
@@ -290,15 +290,15 @@ final class LuaFunctionTests: XCTestCase {
     }
 
     func testRegisterMultipleFunctions() {
-        lua.registerFunction("add") { (a: Int, b: Int) -> Int in
+        lua.register(function: "add") { (a: Int, b: Int) -> Int in
             return a + b
         }
 
-        lua.registerFunction("concat") { (a: String, b: String) -> String in
+        lua.register(function: "concat") { (a: String, b: String) -> String in
             return a + b
         }
 
-        lua.registerFunction("isPositive") { (num: Double) -> Bool in
+        lua.register(function: "isPositive") { (num: Double) -> Bool in
             return num > 0
         }
 
@@ -314,7 +314,7 @@ final class LuaFunctionTests: XCTestCase {
     }
 
     func testRegisterFourParameterFunction() {
-        lua.registerFunction("sum4") { (a: Int, b: Int, c: Int, d: Int) -> Int in
+        lua.register(function: "sum4") { (a: Int, b: Int, c: Int, d: Int) -> Int in
             return a + b + c + d
         }
 
@@ -323,7 +323,7 @@ final class LuaFunctionTests: XCTestCase {
     }
 
     func testRegisterFiveParameterFunction() {
-        lua.registerFunction("format5") { (a: String, b: Int, c: Double, d: Bool, e: String) -> String in
+        lua.register(function: "format5") { (a: String, b: Int, c: Double, d: Bool, e: String) -> String in
             return "\(a)|\(b)|\(c)|\(d)|\(e)"
         }
 
@@ -332,7 +332,7 @@ final class LuaFunctionTests: XCTestCase {
     }
 
     func testRegisterSixParameterFunction() {
-        lua.registerFunction("combine6") { (a: Int, b: Int, c: Int, d: Int, e: Int, f: Int) -> Int in
+        lua.register(function: "combine6") { (a: Int, b: Int, c: Int, d: Int, e: Int, f: Int) -> Int in
             return a + b + c + d + e + f
         }
 
@@ -361,7 +361,7 @@ final class LuaFunctionTests: XCTestCase {
         var counter = 0
         // Remove unused variable warning
 
-        lua.registerFunction("incrementCounter") { () -> Int in
+        lua.register(function: "incrementCounter") { () -> Int in
             counter += 1
             return counter
         }
@@ -402,7 +402,7 @@ final class LuaFunctionTests: XCTestCase {
     // MARK: - Performance Tests
 
     func testFunctionCallPerformance() {
-        lua.registerFunction("square") { (n: Int) -> Int in
+        lua.register(function: "square") { (n: Int) -> Int in
             return n * n
         }
 
@@ -418,14 +418,24 @@ final class LuaFunctionTests: XCTestCase {
 
     // MARK: - Complex Type Tests
 
-    func testArrayParameter() {
-        // Note: Arrays need special handling, skip for now
-        XCTSkip("Array parameters need special handling")
+    func testArrayParameter() throws {
+        lua.register(function: "sumArray") { (values: [Int]) -> Int in
+            values.reduce(0, +)
+        }
+
+        let result = try lua.execute("return sumArray({1, 2, 3, 4})", returning: Int.self)
+
+        XCTAssertEqual(result, 10)
     }
 
-    func testDictionaryParameter() {
-        // Note: Dictionary parameters need special handling, skip for now
-        XCTSkip("Dictionary parameters need special handling")
+    func testDictionaryParameter() throws {
+        lua.register(function: "sumDictionary") { (values: [String: Int]) -> Int in
+            values.values.reduce(0, +)
+        }
+
+        let result = try lua.execute("return sumDictionary({a = 1, b = 2, c = 3})", returning: Int.self)
+
+        XCTAssertEqual(result, 6)
     }
 
     // MARK: - Void Return Tests

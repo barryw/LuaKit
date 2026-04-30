@@ -165,7 +165,7 @@ public final class LuaFunction: @unchecked Sendable {
         lua_createtable(L, 0, 1)
 
         // Set __call metamethod
-        lua_pushstring(L, "__call")
+        luaPushString(L, "__call")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
 
@@ -192,7 +192,7 @@ public final class LuaFunction: @unchecked Sendable {
         lua_settable(L, -3)
 
         // Set __gc metamethod to release the retained reference
-        lua_pushstring(L, "__gc")
+        luaPushString(L, "__gc")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
 
@@ -217,9 +217,17 @@ public final class LuaFunction: @unchecked Sendable {
             print("LuaKit: Pushing result of type \(type(of: result))")
         }
 
-        // Check for Void first
         if result is Void {
             return 0
+        }
+
+        let mirror = Mirror(reflecting: result)
+        if mirror.displayStyle == .optional {
+            guard let child = mirror.children.first else {
+                lua_pushnil(L)
+                return 1
+            }
+            return pushResult(child.value, to: L)
         }
 
         // Check for concrete types before protocols
@@ -234,7 +242,7 @@ public final class LuaFunction: @unchecked Sendable {
             lua_pushnumber(L, double)
             return 1
         case let string as String:
-            lua_pushstring(L, string)
+            luaPushString(L, string)
             return 1
 
         // Collections
@@ -250,10 +258,6 @@ public final class LuaFunction: @unchecked Sendable {
             return pushDoubleArray(doubleArray, to: L)
         case let boolArray as [Bool]:
             return pushBoolArray(boolArray, to: L)
-
-        // Optionals
-        case let optional as Any?:
-            return pushOptional(optional, to: L)
         case let bridgeable as LuaBridgeable:
             type(of: bridgeable).pushAny(bridgeable, to: L)
             return 1
@@ -272,7 +276,7 @@ public final class LuaFunction: @unchecked Sendable {
         }
         lua_createtable(L, 0, Int32(dict.count))
         for (key, value) in dict {
-            lua_pushstring(L, key)
+            luaPushString(L, key)
             _ = pushResult(value, to: L)
             lua_settable(L, -3)
         }
@@ -299,7 +303,7 @@ public final class LuaFunction: @unchecked Sendable {
         lua_createtable(L, Int32(array.count), 0)
         for (index, value) in array.enumerated() {
             lua_pushinteger(L, lua_Integer(index + 1))
-            lua_pushstring(L, value)
+            luaPushString(L, value)
             lua_settable(L, -3)
         }
         return 1
@@ -344,38 +348,6 @@ public final class LuaFunction: @unchecked Sendable {
         return 1
     }
 
-    private static func pushOptional(_ optional: Any?, to L: OpaquePointer) -> Int32 {
-        if let value = optional {
-            let mirror = Mirror(reflecting: value)
-            if mirror.displayStyle == .optional {
-                if debugMode {
-                    print("LuaKit: Unwrapping nested optionals")
-                }
-                var unwrapped: Any? = value
-                while let current = unwrapped {
-                    let currentMirror = Mirror(reflecting: current)
-                    if currentMirror.displayStyle == .optional {
-                        let children = currentMirror.children
-                        unwrapped = children.first?.value
-                    } else {
-                        unwrapped = current
-                        break
-                    }
-                }
-                if let finalValue = unwrapped {
-                    return pushResult(finalValue, to: L)
-                } else {
-                    lua_pushnil(L)
-                    return 1
-                }
-            } else {
-                return pushResult(value, to: L)
-            }
-        } else {
-            lua_pushnil(L)
-            return 1
-        }
-    }
 }
 
 // MARK: - Convenience methods for common closure types

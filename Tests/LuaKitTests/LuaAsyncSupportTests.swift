@@ -375,7 +375,7 @@ final class LuaAsyncSupportTests: XCTestCase {
         lua.registerAsyncSupport()
 
         // Register an async Swift function
-        lua.registerFunction("delayedGreeting") { (name: String) -> String in
+        lua.register(function: "delayedGreeting") { (name: String) -> String in
             let handle = LuaAsyncHandle()
             let id = LuaAsyncRegistry.register(handle)
 
@@ -419,7 +419,7 @@ final class LuaAsyncSupportTests: XCTestCase {
         let resultBox = ResultBox()
 
         // Register a callback handler with a simple approach
-        lua.registerFunction("setAsyncCallback") { (handleId: String) in
+        lua.register(function: "setAsyncCallback") { (handleId: String) in
             guard let uuid = UUID(uuidString: handleId),
                   let handle = LuaAsyncRegistry.get(uuid) else {
                 return

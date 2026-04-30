@@ -159,8 +159,29 @@ final class LuaFunctionAdvancedTests: XCTestCase {
     }
 
     func testFunctionReturningMixedArray() throws {
-        // Skip this test as [Any] arrays can cause infinite recursion in pushResult
-        throw XCTSkip("[Any] arrays can cause infinite recursion in pushResult function")
+        let function = LuaFunction { () -> [Any] in
+            return ["one", 2, true, 4.5]
+        }
+
+        function.push(to: lua.luaState)
+        XCTAssertEqual(lua_pcall(lua.luaState, 0, 1, 0), LUA_OK)
+        XCTAssertEqual(lua_type(lua.luaState, -1), LUA_TTABLE)
+
+        lua_rawgeti(lua.luaState, -1, 1)
+        XCTAssertEqual(String(cString: lua_tostring(lua.luaState, -1)!), "one")
+        lua_pop(lua.luaState, 1)
+
+        lua_rawgeti(lua.luaState, -1, 2)
+        XCTAssertEqual(lua_tointeger(lua.luaState, -1), 2)
+        lua_pop(lua.luaState, 1)
+
+        lua_rawgeti(lua.luaState, -1, 3)
+        XCTAssertEqual(lua_toboolean(lua.luaState, -1), 1)
+        lua_pop(lua.luaState, 1)
+
+        lua_rawgeti(lua.luaState, -1, 4)
+        XCTAssertEqual(lua_tonumber(lua.luaState, -1), 4.5, accuracy: 0.001)
+        lua_pop(lua.luaState, 2)
     }
 
     func testFunctionReturningBridgeable() {
@@ -182,8 +203,16 @@ final class LuaFunctionAdvancedTests: XCTestCase {
     }
 
     func testFunctionReturningUnsupportedType() throws {
-        // Skip this test as it can cause segmentation faults
-        throw XCTSkip("Unsupported type handling can cause segmentation faults")
+        struct Unsupported {}
+
+        let function = LuaFunction { () -> Unsupported in
+            Unsupported()
+        }
+
+        function.push(to: lua.luaState)
+        XCTAssertEqual(lua_pcall(lua.luaState, 0, 1, 0), LUA_OK)
+        XCTAssertEqual(lua_type(lua.luaState, -1), LUA_TNIL)
+        lua_pop(lua.luaState, 1)
     }
 
     // MARK: - Optional Handling Tests
@@ -235,9 +264,27 @@ final class LuaFunctionAdvancedTests: XCTestCase {
     // MARK: - Closure Table Lifecycle Tests
 
     func testFunctionTableGarbageCollection() throws {
-        // Skip this test as it causes segmentation fault
-        // When Swift function is deallocated, calling from Lua crashes
-        throw XCTSkip("Function GC test causes segmentation fault when Swift reference is released")
+        weak var weakFunction: LuaFunction?
+
+        autoreleasepool {
+            var function: LuaFunction? = LuaFunction { () -> Int in 42 }
+            weakFunction = function
+
+            function?.push(to: lua.luaState)
+            lua_setglobal(lua.luaState, "temporaryFunction")
+            function = nil
+
+            XCTAssertNotNil(weakFunction)
+        }
+
+        try lua.execute("""
+            assert(temporaryFunction() == 42)
+            temporaryFunction = nil
+            collectgarbage("collect")
+            collectgarbage("collect")
+        """)
+
+        XCTAssertNil(weakFunction)
     }
 
     func testFunctionInvalidCall() {
@@ -316,14 +363,38 @@ final class LuaFunctionAdvancedTests: XCTestCase {
 
     // MARK: - Edge Cases
 
-    func testVeryLargeClosureId() throws {
-        // Skip this test as it can cause memory issues
-        throw XCTSkip("Very large closure ID test can cause memory pressure and segmentation faults")
-    }
-
     func testFunctionDeallocationOrder() throws {
-        // Skip this test as it can cause segmentation faults
-        throw XCTSkip("Function deallocation order test can cause segmentation faults")
+        weak var firstFunction: LuaFunction?
+        weak var secondFunction: LuaFunction?
+
+        autoreleasepool {
+            var first: LuaFunction? = LuaFunction { () -> String in "first" }
+            var second: LuaFunction? = LuaFunction { () -> String in "second" }
+            firstFunction = first
+            secondFunction = second
+
+            first?.push(to: lua.luaState)
+            lua_setglobal(lua.luaState, "firstFunction")
+            second?.push(to: lua.luaState)
+            lua_setglobal(lua.luaState, "secondFunction")
+
+            first = nil
+            second = nil
+            XCTAssertNotNil(firstFunction)
+            XCTAssertNotNil(secondFunction)
+        }
+
+        try lua.execute("""
+            assert(firstFunction() == "first")
+            assert(secondFunction() == "second")
+            firstFunction = nil
+            secondFunction = nil
+            collectgarbage("collect")
+            collectgarbage("collect")
+        """)
+
+        XCTAssertNil(firstFunction)
+        XCTAssertNil(secondFunction)
     }
 
     // MARK: - Performance Tests

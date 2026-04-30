@@ -19,7 +19,7 @@ final class ClosureBridgingTests: XCTestCase {
         }
 
         // Call from Lua
-        let result = try lua.executeReturning("return getAnswer()", as: Int.self)
+        let result = try lua.execute("return getAnswer()", returning: Int.self)
         XCTAssertEqual(result, 42)
     }
 
@@ -32,7 +32,7 @@ final class ClosureBridgingTests: XCTestCase {
         }
 
         // Call from Lua
-        let result = try lua.executeReturning("return add(10, 32)", as: Int.self)
+        let result = try lua.execute("return add(10, 32)", returning: Int.self)
         XCTAssertEqual(result, 42)
     }
 
@@ -47,9 +47,9 @@ final class ClosureBridgingTests: XCTestCase {
         lua.globals["createImage"] = createImage
 
         // Call from Lua and verify
-        let result = try lua.executeReturning("""
+        let result = try lua.execute("""
             return createImage(1920, 1080)
-        """, as: String.self)
+        """, returning: String.self)
         XCTAssertEqual(result, "Image 1920x1080")
     }
 
@@ -74,11 +74,11 @@ final class ClosureBridgingTests: XCTestCase {
         }
 
         // Test returning a value
-        let result1 = try lua.executeReturning("return maybeGetValue(true)", as: String.self)
+        let result1 = try lua.execute("return maybeGetValue(true)", returning: String.self)
         XCTAssertEqual(result1, "Hello")
 
         // Test returning nil
-        let nilCheck = try lua.executeReturning("return maybeGetValue(false) == nil", as: Bool.self)
+        let nilCheck = try lua.execute("return maybeGetValue(false) == nil", returning: Bool.self)
         XCTAssertTrue(nilCheck)
     }
 
@@ -86,33 +86,33 @@ final class ClosureBridgingTests: XCTestCase {
         let lua = try LuaState()
 
         // Test various registerFunction overloads
-        lua.registerFunction("noParams") {
+        lua.register(function: "noParams") {
             return "Hello from Swift"
         }
 
-        lua.registerFunction("oneParam") { (name: String) in
+        lua.register(function: "oneParam") { (name: String) in
             return "Hello, \(name)!"
         }
 
-        lua.registerFunction("twoParams") { (a: Int, b: Int) in
+        lua.register(function: "twoParams") { (a: Int, b: Int) in
             return a * b
         }
 
-        lua.registerFunction("threeParams") { (x: Int, y: Int, z: Int) in
+        lua.register(function: "threeParams") { (x: Int, y: Int, z: Int) in
             return x + y + z
         }
 
         // Test them all
-        let r1 = try lua.executeReturning("return noParams()", as: String.self)
+        let r1 = try lua.execute("return noParams()", returning: String.self)
         XCTAssertEqual(r1, "Hello from Swift")
 
-        let r2 = try lua.executeReturning("return oneParam('World')", as: String.self)
+        let r2 = try lua.execute("return oneParam('World')", returning: String.self)
         XCTAssertEqual(r2, "Hello, World!")
 
-        let r3 = try lua.executeReturning("return twoParams(6, 7)", as: Int.self)
+        let r3 = try lua.execute("return twoParams(6, 7)", returning: Int.self)
         XCTAssertEqual(r3, 42)
 
-        let r4 = try lua.executeReturning("return threeParams(10, 20, 30)", as: Int.self)
+        let r4 = try lua.execute("return threeParams(10, 20, 30)", returning: Int.self)
         XCTAssertEqual(r4, 60)
     }
 
@@ -146,7 +146,7 @@ final class ClosureBridgingTests: XCTestCase {
         // For now, closures must be explicitly wrapped in LuaFunction
         lua.globals["explicitFunc"] = LuaFunction { return "Explicit LuaFunction!" }
 
-        let result = try lua.executeReturning("return explicitFunc()", as: String.self)
+        let result = try lua.execute("return explicitFunc()", returning: String.self)
         XCTAssertEqual(result, "Explicit LuaFunction!")
     }
 }

@@ -21,7 +21,7 @@ final class SimpleFunctionTests: XCTestCase {
         lua.globals["testFunc"] = fn
 
         // Call it from Lua
-        let result = try lua.executeReturning("return testFunc()", as: Int.self)
+        let result = try lua.execute("return testFunc()", returning: Int.self)
         XCTAssertEqual(result, 42)
     }
 
@@ -34,7 +34,7 @@ final class SimpleFunctionTests: XCTestCase {
 
         lua.globals["getMessage"] = fn
 
-        let result = try lua.executeReturning("return getMessage()", as: String.self)
+        let result = try lua.execute("return getMessage()", returning: String.self)
         XCTAssertEqual(result, "Hello from Swift")
     }
 
@@ -47,7 +47,7 @@ final class SimpleFunctionTests: XCTestCase {
 
         lua.globals["add"] = fn
 
-        let result = try lua.executeReturning("return add(10, 5)", as: Int.self)
+        let result = try lua.execute("return add(10, 5)", returning: Int.self)
         XCTAssertEqual(result, 15)
     }
 }

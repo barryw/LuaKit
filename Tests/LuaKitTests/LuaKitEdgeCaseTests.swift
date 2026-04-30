@@ -116,14 +116,28 @@ final class LuaKitEdgeCaseTests: XCTestCase {
         XCTAssertEqual(buffer.count, 20)
     }
 
-    func testPrintBufferTruncateOldestPolicy() {
-        // Skip this test as it generates many print statements that can cause issues
-        XCTSkip("Print buffer truncation test can cause segmentation faults")
+    func testPrintBufferTruncateOldestPolicy() throws {
+        lua.setPrintBufferPolicy(.truncateOldest)
+        let payload = "start-" + String(repeating: "x", count: 1_000_010) + "-end"
+
+        _ = try lua.execute("print('\(payload)')")
+
+        let buffer = lua.getCurrentPrintBuffer()
+        XCTAssertEqual(buffer.count, 1_000_000)
+        XCTAssertFalse(buffer.hasPrefix("start-"))
+        XCTAssertTrue(buffer.hasSuffix("-end\n"))
     }
 
-    func testPrintBufferTruncateNewestPolicy() {
-        // Skip this test as it generates many print statements that can cause issues
-        XCTSkip("Print buffer truncation test can cause segmentation faults")
+    func testPrintBufferTruncateNewestPolicy() throws {
+        lua.setPrintBufferPolicy(.truncateNewest)
+        let payload = "start-" + String(repeating: "x", count: 1_000_010) + "-end"
+
+        _ = try lua.execute("print('\(payload)')")
+
+        let buffer = lua.getCurrentPrintBuffer()
+        XCTAssertEqual(buffer.count, 1_000_000)
+        XCTAssertTrue(buffer.hasPrefix("start-"))
+        XCTAssertFalse(buffer.hasSuffix("-end\n"))
     }
 
     // MARK: - Type Extraction Edge Cases
@@ -223,10 +237,4 @@ final class LuaKitEdgeCaseTests: XCTestCase {
         XCTAssertNil(result2)
     }
 
-    // MARK: - Memory Pressure Tests
-
-    func testHighMemoryPressure() {
-        // Skip this test as it causes excessive memory pressure and segmentation faults
-        XCTSkip("High memory pressure test causes segmentation faults due to excessive memory allocation")
-    }
 }

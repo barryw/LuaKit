@@ -56,26 +56,33 @@ public final class LuaCoroutine: @unchecked Sendable {
     ///   - code: The Lua code to execute in the coroutine.
     /// - Throws: `LuaError.syntax` if the code has syntax errors.
     public init(from state: LuaState, code: String) throws {
-        let L = state.luaState
+        let created = try state.withLuaLock {
+            let L = state.luaState
 
-        // Create a new thread (coroutine)
-        guard let newThread = lua_newthread(L) else {
-            throw LuaError.memoryAllocation
+            // Create a new thread (coroutine)
+            guard let newThread = lua_newthread(L) else {
+                throw LuaError.memoryAllocation
+            }
+
+            // Store thread reference to prevent garbage collection
+            let threadReference = luaL_ref(L, luaRegistryIndex)
+
+            // Load the code onto the new thread's stack
+            let loadResult = luaL_loadstring(newThread, code)
+            if loadResult != LUA_OK {
+                let errorMsg = luaString(newThread, at: -1) ?? "Unknown coroutine syntax error"
+                lua_pop(newThread, 1)
+                luaL_unref(L, luaRegistryIndex, threadReference)
+                throw LuaError.syntax(errorMsg)
+            }
+
+            state.registerThread(newThread)
+            return (thread: newThread, reference: threadReference)
         }
-        self.thread = newThread
 
-        // Store thread reference to prevent garbage collection
-        self.threadReference = luaL_ref(L, luaRegistryIndex)
+        self.thread = created.thread
+        self.threadReference = created.reference
         self.luaState = state
-
-        // Load the code onto the new thread's stack
-        let loadResult = luaL_loadstring(newThread, code)
-        if loadResult != LUA_OK {
-            let errorMsg = String(cString: lua_tolstring(newThread, -1, nil)!)
-            lua_pop(newThread, 1)
-            luaL_unref(L, luaRegistryIndex, threadReference)
-            throw LuaError.syntax(errorMsg)
-        }
     }
 
     /// Creates a coroutine from an existing callable.
@@ -87,31 +94,41 @@ public final class LuaCoroutine: @unchecked Sendable {
             throw LuaError.stateInvalid
         }
 
-        let L = state.luaState
+        let created = try state.withLuaLock {
+            let L = state.luaState
 
-        // Create a new thread (coroutine)
-        guard let newThread = lua_newthread(L) else {
-            throw LuaError.memoryAllocation
+            // Create a new thread (coroutine)
+            guard let newThread = lua_newthread(L) else {
+                throw LuaError.memoryAllocation
+            }
+
+            // Store thread reference to prevent garbage collection
+            let threadReference = luaL_ref(L, luaRegistryIndex)
+
+            // Push the callable's function onto the main stack
+            callable.pushFunction()
+
+            // Move the function from the main stack to the coroutine's stack
+            lua_xmove(L, newThread, 1)
+            state.registerThread(newThread)
+            return (thread: newThread, reference: threadReference)
         }
-        self.thread = newThread
 
-        // Store thread reference to prevent garbage collection
-        self.threadReference = luaL_ref(L, luaRegistryIndex)
+        self.thread = created.thread
+        self.threadReference = created.reference
         self.luaState = state
-
-        // Push the callable's function onto the main stack
-        callable.pushFunction()
-
-        // Move the function from the main stack to the coroutine's stack
-        lua_xmove(L, newThread, 1)
     }
 
     deinit {
         lock.lock()
-        defer { lock.unlock() }
+        let state = luaState
+        lock.unlock()
 
-        if let state = luaState {
-            luaL_unref(state.luaState, luaRegistryIndex, threadReference)
+        if let state {
+            state.withLuaLock {
+                state.unregisterThread(thread)
+                luaL_unref(state.luaState, luaRegistryIndex, threadReference)
+            }
         }
     }
 
@@ -125,35 +142,36 @@ public final class LuaCoroutine: @unchecked Sendable {
     /// The current status of the coroutine.
     public var status: Status {
         lock.lock()
-        defer { lock.unlock() }
-
-        guard luaState != nil else {
+        guard let state = luaState else {
+            lock.unlock()
             return .dead
         }
+        defer { lock.unlock() }
 
-        let luaStatus = lua_status(thread)
+        return state.withLuaLock {
+            let luaStatus = lua_status(thread)
 
-        switch luaStatus {
-        case LUA_OK:
-            // LUA_OK means the coroutine is either newly created or finished
-            // Check if there's a function on the stack (newly created)
-            if lua_gettop(thread) > 0 && lua_type(thread, 1) == LUA_TFUNCTION {
+            switch luaStatus {
+            case LUA_OK:
+                // LUA_OK means the coroutine is either newly created or finished
+                // Check if there's a function on the stack (newly created)
+                if lua_gettop(thread) > 0 && lua_type(thread, 1) == LUA_TFUNCTION {
+                    return .suspended
+                }
+                return .dead
+            case LUA_YIELD:
                 return .suspended
+            default:
+                // Any error status means the coroutine is dead
+                return .dead
             }
-            return .dead
-        case LUA_YIELD:
-            return .suspended
-        default:
-            // Any error status means the coroutine is dead
-            return .dead
         }
     }
 
     // MARK: - Private Helpers
 
     private func extractError() -> LuaError {
-        if let errorStr = lua_tolstring(thread, -1, nil) {
-            let error = String(cString: errorStr)
+        if let error = luaString(thread, at: -1) {
             lua_pop(thread, 1)
             return .coroutineError(error)
         }
@@ -171,6 +189,19 @@ public final class LuaCoroutine: @unchecked Sendable {
         return result
     }
 
+    private func withValidState<R>(_ body: (LuaState) throws -> R) throws -> R {
+        lock.lock()
+        guard let state = luaState else {
+            lock.unlock()
+            throw LuaError.stateInvalid
+        }
+
+        defer { lock.unlock() }
+        return try state.withLuaLock {
+            try body(state)
+        }
+    }
+
     // MARK: - Resume Methods
 
     /// Resumes the coroutine with no arguments and returns a value.
@@ -179,25 +210,20 @@ public final class LuaCoroutine: @unchecked Sendable {
     /// - Throws: `LuaError.stateInvalid` if the state is invalid,
     ///           `LuaError.coroutineError` if the coroutine cannot be resumed.
     public func resume<R: LuaConvertible>() throws -> R {
-        lock.lock()
-        guard luaState != nil else {
-            lock.unlock()
-            throw LuaError.stateInvalid
+        try withValidState { state in
+            var nresults: Int32 = 0
+            let result = state.protectedResume(thread: thread, argumentCount: 0, resultCount: &nresults)
+
+            if result != LUA_OK && result != LUA_YIELD {
+                throw extractError()
+            }
+
+            if nresults == 0 {
+                throw LuaError.coroutineError("Coroutine did not return a value")
+            }
+
+            return try pullResult()
         }
-        lock.unlock()
-
-        var nresults: Int32 = 0
-        let result = lua_resume(thread, nil, 0, &nresults)
-
-        if result != LUA_OK && result != LUA_YIELD {
-            throw extractError()
-        }
-
-        if nresults == 0 {
-            throw LuaError.coroutineError("Coroutine did not return a value")
-        }
-
-        return try pullResult()
     }
 
     /// Resumes the coroutine with one argument and returns a value.
@@ -206,27 +232,22 @@ public final class LuaCoroutine: @unchecked Sendable {
     /// - Returns: The yielded or returned value.
     /// - Throws: `LuaError.stateInvalid` if the state is invalid.
     public func resume<T1: LuaConvertible, R: LuaConvertible>(_ arg1: T1) throws -> R {
-        lock.lock()
-        guard luaState != nil else {
-            lock.unlock()
-            throw LuaError.stateInvalid
+        try withValidState { state in
+            T1.push(arg1, to: thread)
+
+            var nresults: Int32 = 0
+            let result = state.protectedResume(thread: thread, argumentCount: 1, resultCount: &nresults)
+
+            if result != LUA_OK && result != LUA_YIELD {
+                throw extractError()
+            }
+
+            if nresults == 0 {
+                throw LuaError.coroutineError("Coroutine did not return a value")
+            }
+
+            return try pullResult()
         }
-        lock.unlock()
-
-        T1.push(arg1, to: thread)
-
-        var nresults: Int32 = 0
-        let result = lua_resume(thread, nil, 1, &nresults)
-
-        if result != LUA_OK && result != LUA_YIELD {
-            throw extractError()
-        }
-
-        if nresults == 0 {
-            throw LuaError.coroutineError("Coroutine did not return a value")
-        }
-
-        return try pullResult()
     }
 
     /// Resumes the coroutine with two arguments and returns a value.
@@ -234,28 +255,23 @@ public final class LuaCoroutine: @unchecked Sendable {
         _ arg1: T1,
         _ arg2: T2
     ) throws -> R {
-        lock.lock()
-        guard luaState != nil else {
-            lock.unlock()
-            throw LuaError.stateInvalid
+        try withValidState { state in
+            T1.push(arg1, to: thread)
+            T2.push(arg2, to: thread)
+
+            var nresults: Int32 = 0
+            let result = state.protectedResume(thread: thread, argumentCount: 2, resultCount: &nresults)
+
+            if result != LUA_OK && result != LUA_YIELD {
+                throw extractError()
+            }
+
+            if nresults == 0 {
+                throw LuaError.coroutineError("Coroutine did not return a value")
+            }
+
+            return try pullResult()
         }
-        lock.unlock()
-
-        T1.push(arg1, to: thread)
-        T2.push(arg2, to: thread)
-
-        var nresults: Int32 = 0
-        let result = lua_resume(thread, nil, 2, &nresults)
-
-        if result != LUA_OK && result != LUA_YIELD {
-            throw extractError()
-        }
-
-        if nresults == 0 {
-            throw LuaError.coroutineError("Coroutine did not return a value")
-        }
-
-        return try pullResult()
     }
 
     // MARK: - Resume Void (ignore return value)
@@ -264,47 +280,37 @@ public final class LuaCoroutine: @unchecked Sendable {
     ///
     /// - Throws: `LuaError.stateInvalid` if the state is invalid.
     public func resumeVoid() throws {
-        lock.lock()
-        guard luaState != nil else {
-            lock.unlock()
-            throw LuaError.stateInvalid
-        }
-        lock.unlock()
+        try withValidState { state in
+            var nresults: Int32 = 0
+            let result = state.protectedResume(thread: thread, argumentCount: 0, resultCount: &nresults)
 
-        var nresults: Int32 = 0
-        let result = lua_resume(thread, nil, 0, &nresults)
+            if result != LUA_OK && result != LUA_YIELD {
+                throw extractError()
+            }
 
-        if result != LUA_OK && result != LUA_YIELD {
-            throw extractError()
-        }
-
-        // Pop any results
-        if nresults > 0 {
-            lua_pop(thread, nresults)
+            // Pop any results
+            if nresults > 0 {
+                lua_pop(thread, nresults)
+            }
         }
     }
 
     /// Resumes the coroutine with one argument, ignoring the return value.
     public func resumeVoid<T1: LuaConvertible>(_ arg1: T1) throws {
-        lock.lock()
-        guard luaState != nil else {
-            lock.unlock()
-            throw LuaError.stateInvalid
-        }
-        lock.unlock()
+        try withValidState { state in
+            T1.push(arg1, to: thread)
 
-        T1.push(arg1, to: thread)
+            var nresults: Int32 = 0
+            let result = state.protectedResume(thread: thread, argumentCount: 1, resultCount: &nresults)
 
-        var nresults: Int32 = 0
-        let result = lua_resume(thread, nil, 1, &nresults)
+            if result != LUA_OK && result != LUA_YIELD {
+                throw extractError()
+            }
 
-        if result != LUA_OK && result != LUA_YIELD {
-            throw extractError()
-        }
-
-        // Pop any results
-        if nresults > 0 {
-            lua_pop(thread, nresults)
+            // Pop any results
+            if nresults > 0 {
+                lua_pop(thread, nresults)
+            }
         }
     }
 }

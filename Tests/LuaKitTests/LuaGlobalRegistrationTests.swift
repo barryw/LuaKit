@@ -46,10 +46,14 @@ final class LuaGlobalRegistrationTests: XCTestCase {
         XCTAssertEqual(lua.globals["testString"] as? String, "Hello, Lua!")
     }
 
-    func testRegisterGlobalBridgeable() {
-        // Skip test due to @LuaBridgeable macro issues in tests
-        // The macro expansion requires proper module context
-        XCTSkip("@LuaBridgeable macro expansion issues in test context")
+    func testRegisterGlobalBridgeable() throws {
+        TestGlobalsBridgeable.register(in: lua, as: "TestBridgeable")
+        let object = TestGlobalsBridgeable()
+
+        lua.registerGlobal("bridgeableObject", object)
+
+        let type = try lua.execute("return type(bridgeableObject)", returning: String.self)
+        XCTAssertEqual(type, "userdata")
     }
 
     func testRegisterMultipleGlobals() {
@@ -155,14 +159,14 @@ final class LuaGlobalRegistrationTests: XCTestCase {
 
     // MARK: - Enum Registration Tests
 
-    enum TestEnum: String, CaseIterable {
+    enum TestEnum: String, CaseIterable, LuaBridgeableEnum {
         case option1 = "opt1"
         case option2 = "opt2"
         case option3 = "opt3"
     }
 
     func testRegisterEnum() {
-        lua.registerEnum(TestEnum.self, as: "Options")
+        lua.register(enum: TestEnum.self, as: "Options")
 
         // Check enum values are available
         _ = try? lua.execute("""

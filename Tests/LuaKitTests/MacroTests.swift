@@ -89,13 +89,44 @@ class Image: LuaBridgeable {
     }
 }
 
+@LuaBridgeable
+class MacroCollectionBox: LuaBridgeable {
+    var labels: [String]
+    var scores: [String: Int]
+
+    init() {
+        self.labels = ["alpha", "beta"]
+        self.scores = ["alpha": 1, "beta": 2]
+    }
+
+    func allLabels() -> [String] {
+        labels
+    }
+
+    func allScores() -> [String: Int] {
+        scores
+    }
+
+    func sum(_ values: [Int]) -> Int {
+        values.reduce(0, +)
+    }
+
+    func lookup(_ values: [String: Int]) -> Int {
+        values["alpha"] ?? 0
+    }
+
+    var description: String {
+        return "MacroCollectionBox"
+    }
+}
+
 final class MacroTests: XCTestCase {
     func testMacroGeneratedCode() throws {
         let lua = try LuaState()
         lua.register(MacroTestPerson.self, as: "Person")
 
         var output = ""
-        lua.setPrintHandler { text in
+        lua.onPrint { text in
             output += text
         }
 
@@ -126,7 +157,7 @@ final class MacroTests: XCTestCase {
         lua.register(SecureData.self, as: "SecureData")
 
         var output = ""
-        lua.setPrintHandler { text in
+        lua.onPrint { text in
             output += text
         }
 
@@ -163,7 +194,7 @@ final class MacroTests: XCTestCase {
         lua.register(Image.self, as: "Image")
 
         var output = ""
-        lua.setPrintHandler { text in
+        lua.onPrint { text in
             output += text
         }
 
@@ -187,5 +218,26 @@ final class MacroTests: XCTestCase {
         XCTAssertTrue(output.contains("600"))
         XCTAssertTrue(output.contains("Area:"))
         XCTAssertTrue(output.contains("480000")) // 800 * 600
+    }
+
+    func testMacroGeneratedCollectionBridging() throws {
+        let lua = try LuaState()
+        lua.register(MacroCollectionBox.self, as: "CollectionBox")
+
+        let total: Int = try lua.execute("""
+            local box = CollectionBox.new()
+            box.labels[3] = "gamma"
+            box.scores = { alpha = 7, beta = 9 }
+
+            local labels = box:allLabels()
+            local scores = box:allScores()
+
+            return box:sum({ 1, 2, 3 })
+                 + box:lookup({ alpha = 4 })
+                 + scores.beta
+                 + #labels
+        """, returning: Int.self)
+
+        XCTAssertEqual(total, 22)
     }
 }

@@ -69,7 +69,7 @@ final class LuaArrayProxyAdditionalCoverageTests: XCTestCase {
 
         // Test invalid property access
         let result = try? lua.execute("return intProxy.invalid")
-        XCTAssertTrue(result == nil || (result as? String)?.isEmpty == true || result as? String == "nil")
+        XCTAssertTrue(result == nil || result?.isEmpty == true || result == "nil")
 
         // Test assignment
         _ = try? lua.execute("intProxy[2] = 999")
@@ -175,7 +175,7 @@ final class LuaArrayProxyAdditionalCoverageTests: XCTestCase {
         let result = try? lua.execute("""
             stringProxy[1] = 123  -- Should fail, expects string
         """)
-        XCTAssertTrue(result == nil || (result as? String)?.isEmpty == true || result as? String == "nil")
+        XCTAssertTrue(result == nil || result?.isEmpty == true || result == "nil")
     }
 
     func testArrayProxyNonNumericIndex() {

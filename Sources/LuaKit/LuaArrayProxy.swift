@@ -106,7 +106,7 @@ public final class LuaStringArrayProxy: LuaArrayProxy<String>, LuaBridgeable {
 
     public static func registerMethods(_ L: OpaquePointer) {
         // __index metamethod for element access
-        lua_pushstring(L, "__index")
+        luaPushString(L, "__index")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
 
@@ -149,7 +149,7 @@ public final class LuaStringArrayProxy: LuaArrayProxy<String>, LuaBridgeable {
         lua_settable(L, -3)
 
         // __newindex metamethod for element assignment
-        lua_pushstring(L, "__newindex")
+        luaPushString(L, "__newindex")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
 
@@ -184,7 +184,7 @@ public final class LuaStringArrayProxy: LuaArrayProxy<String>, LuaBridgeable {
         lua_settable(L, -3)
 
         // __len metamethod for # operator
-        lua_pushstring(L, "__len")
+        luaPushString(L, "__len")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
             guard let proxy = LuaStringArrayProxy.checkUserdata(L, at: 1) else {
@@ -196,7 +196,7 @@ public final class LuaStringArrayProxy: LuaArrayProxy<String>, LuaBridgeable {
         lua_settable(L, -3)
 
         // __ipairs metamethod for iteration
-        lua_pushstring(L, "__ipairs")
+        luaPushString(L, "__ipairs")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
 
@@ -235,7 +235,7 @@ public final class LuaStringArrayProxy: LuaArrayProxy<String>, LuaBridgeable {
         lua_settable(L, -3)
 
         // __tostring metamethod
-        lua_pushstring(L, "__tostring")
+        luaPushString(L, "__tostring")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
             guard let proxy = LuaStringArrayProxy.checkUserdata(L, at: 1) else {
@@ -244,7 +244,7 @@ public final class LuaStringArrayProxy: LuaArrayProxy<String>, LuaBridgeable {
             let array = proxy.toArray()
             let elementStrings = array.map { "\"\($0)\"" }
             let arrayString = "[\(elementStrings.joined(separator: ", "))]"
-            lua_pushstring(L, arrayString)
+            luaPushString(L, arrayString)
             return 1
         }, 0)
         lua_settable(L, -3)
@@ -265,7 +265,7 @@ public final class LuaIntArrayProxy: LuaArrayProxy<Int>, LuaBridgeable {
 
     public static func registerMethods(_ L: OpaquePointer) {
         // __index metamethod for element access
-        lua_pushstring(L, "__index")
+        luaPushString(L, "__index")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
 
@@ -308,7 +308,7 @@ public final class LuaIntArrayProxy: LuaArrayProxy<Int>, LuaBridgeable {
         lua_settable(L, -3)
 
         // __newindex metamethod for element assignment
-        lua_pushstring(L, "__newindex")
+        luaPushString(L, "__newindex")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
 
@@ -343,7 +343,7 @@ public final class LuaIntArrayProxy: LuaArrayProxy<Int>, LuaBridgeable {
         lua_settable(L, -3)
 
         // __len metamethod for # operator
-        lua_pushstring(L, "__len")
+        luaPushString(L, "__len")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
             guard let proxy = LuaIntArrayProxy.checkUserdata(L, at: 1) else {
@@ -355,7 +355,7 @@ public final class LuaIntArrayProxy: LuaArrayProxy<Int>, LuaBridgeable {
         lua_settable(L, -3)
 
         // __ipairs metamethod for iteration
-        lua_pushstring(L, "__ipairs")
+        luaPushString(L, "__ipairs")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
 
@@ -394,7 +394,7 @@ public final class LuaIntArrayProxy: LuaArrayProxy<Int>, LuaBridgeable {
         lua_settable(L, -3)
 
         // __tostring metamethod
-        lua_pushstring(L, "__tostring")
+        luaPushString(L, "__tostring")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
             guard let proxy = LuaIntArrayProxy.checkUserdata(L, at: 1) else {
@@ -403,7 +403,7 @@ public final class LuaIntArrayProxy: LuaArrayProxy<Int>, LuaBridgeable {
             let array = proxy.toArray()
             let elementStrings = array.map { String($0) }
             let arrayString = "[\(elementStrings.joined(separator: ", "))]"
-            lua_pushstring(L, arrayString)
+            luaPushString(L, arrayString)
             return 1
         }, 0)
         lua_settable(L, -3)
@@ -424,7 +424,7 @@ public final class LuaDoubleArrayProxy: LuaArrayProxy<Double>, LuaBridgeable {
 
     public static func registerMethods(_ L: OpaquePointer) {
         // __index metamethod for element access
-        lua_pushstring(L, "__index")
+        luaPushString(L, "__index")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
 
@@ -467,7 +467,7 @@ public final class LuaDoubleArrayProxy: LuaArrayProxy<Double>, LuaBridgeable {
         lua_settable(L, -3)
 
         // __newindex metamethod for element assignment
-        lua_pushstring(L, "__newindex")
+        luaPushString(L, "__newindex")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
 
@@ -502,7 +502,7 @@ public final class LuaDoubleArrayProxy: LuaArrayProxy<Double>, LuaBridgeable {
         lua_settable(L, -3)
 
         // __len metamethod for # operator
-        lua_pushstring(L, "__len")
+        luaPushString(L, "__len")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
             guard let proxy = LuaDoubleArrayProxy.checkUserdata(L, at: 1) else {
@@ -514,7 +514,7 @@ public final class LuaDoubleArrayProxy: LuaArrayProxy<Double>, LuaBridgeable {
         lua_settable(L, -3)
 
         // __ipairs metamethod for iteration
-        lua_pushstring(L, "__ipairs")
+        luaPushString(L, "__ipairs")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
 
@@ -553,7 +553,7 @@ public final class LuaDoubleArrayProxy: LuaArrayProxy<Double>, LuaBridgeable {
         lua_settable(L, -3)
 
         // __tostring metamethod
-        lua_pushstring(L, "__tostring")
+        luaPushString(L, "__tostring")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
             guard let proxy = LuaDoubleArrayProxy.checkUserdata(L, at: 1) else {
@@ -562,7 +562,7 @@ public final class LuaDoubleArrayProxy: LuaArrayProxy<Double>, LuaBridgeable {
             let array = proxy.toArray()
             let elementStrings = array.map { String($0) }
             let arrayString = "[\(elementStrings.joined(separator: ", "))]"
-            lua_pushstring(L, arrayString)
+            luaPushString(L, arrayString)
             return 1
         }, 0)
         lua_settable(L, -3)
@@ -583,7 +583,7 @@ public final class LuaBoolArrayProxy: LuaArrayProxy<Bool>, LuaBridgeable {
 
     public static func registerMethods(_ L: OpaquePointer) {
         // __index metamethod for element access
-        lua_pushstring(L, "__index")
+        luaPushString(L, "__index")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
 
@@ -626,7 +626,7 @@ public final class LuaBoolArrayProxy: LuaArrayProxy<Bool>, LuaBridgeable {
         lua_settable(L, -3)
 
         // __newindex metamethod for element assignment
-        lua_pushstring(L, "__newindex")
+        luaPushString(L, "__newindex")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
 
@@ -661,7 +661,7 @@ public final class LuaBoolArrayProxy: LuaArrayProxy<Bool>, LuaBridgeable {
         lua_settable(L, -3)
 
         // __len metamethod for # operator
-        lua_pushstring(L, "__len")
+        luaPushString(L, "__len")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
             guard let proxy = LuaBoolArrayProxy.checkUserdata(L, at: 1) else {
@@ -673,7 +673,7 @@ public final class LuaBoolArrayProxy: LuaArrayProxy<Bool>, LuaBridgeable {
         lua_settable(L, -3)
 
         // __ipairs metamethod for iteration
-        lua_pushstring(L, "__ipairs")
+        luaPushString(L, "__ipairs")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
 
@@ -712,7 +712,7 @@ public final class LuaBoolArrayProxy: LuaArrayProxy<Bool>, LuaBridgeable {
         lua_settable(L, -3)
 
         // __tostring metamethod
-        lua_pushstring(L, "__tostring")
+        luaPushString(L, "__tostring")
         lua_pushcclosure(L, { L in
             guard let L = L else { return 0 }
             guard let proxy = LuaBoolArrayProxy.checkUserdata(L, at: 1) else {
@@ -721,7 +721,7 @@ public final class LuaBoolArrayProxy: LuaArrayProxy<Bool>, LuaBridgeable {
             let array = proxy.toArray()
             let elementStrings = array.map { $0 ? "true" : "false" }
             let arrayString = "[\(elementStrings.joined(separator: ", "))]"
-            lua_pushstring(L, arrayString)
+            luaPushString(L, arrayString)
             return 1
         }, 0)
         lua_settable(L, -3)

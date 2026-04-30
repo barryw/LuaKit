@@ -104,7 +104,7 @@ final class LuaStateTests: XCTestCase {
 
     func testSetPrintHandler() {
         var capturedOutput = ""
-        lua.setPrintHandler { output in
+        lua.onPrint { output in
             capturedOutput += output
         }
 
@@ -114,7 +114,7 @@ final class LuaStateTests: XCTestCase {
 
     func testSetOutputHandler() {
         var capturedOutput = ""
-        lua.setOutputHandler { output in
+        lua.onPrint { output in
             capturedOutput += output
         }
 
@@ -220,35 +220,35 @@ final class LuaStateTests: XCTestCase {
     // MARK: - ExecuteReturning Tests
 
     func testExecuteReturningInt() {
-        let result = try? lua.executeReturning("return 42", as: Int.self)
+        let result = try? lua.execute("return 42", returning: Int.self)
         XCTAssertEqual(result, 42)
     }
 
     func testExecuteReturningDouble() {
-        let result = try? lua.executeReturning("return 3.14159", as: Double.self)
+        let result = try? lua.execute("return 3.14159", returning: Double.self)
         XCTAssertEqual(result ?? 0.0, 3.14159, accuracy: 0.00001)
     }
 
     func testExecuteReturningString() {
-        let result = try? lua.executeReturning("return 'Hello'", as: String.self)
+        let result = try? lua.execute("return 'Hello'", returning: String.self)
         XCTAssertEqual(result, "Hello")
     }
 
     func testExecuteReturningBool() {
-        let result1 = try? lua.executeReturning("return true", as: Bool.self)
+        let result1 = try? lua.execute("return true", returning: Bool.self)
         XCTAssertEqual(result1, true)
 
-        let result2 = try? lua.executeReturning("return false", as: Bool.self)
+        let result2 = try? lua.execute("return false", returning: Bool.self)
         XCTAssertEqual(result2, false)
     }
 
     func testExecuteReturningArray() {
-        let result = try? lua.executeReturning("return {1, 2, 3, 4, 5}", as: [Int].self)
+        let result = try? lua.execute("return {1, 2, 3, 4, 5}", returning: [Int].self)
         XCTAssertEqual(result, [1, 2, 3, 4, 5])
     }
 
     func testExecuteReturningTypeMismatch() {
-        XCTAssertThrowsError(try lua.executeReturning("return 'not a number'", as: Int.self)) { error in
+        XCTAssertThrowsError(try lua.execute("return 'not a number'", returning: Int.self)) { error in
             guard let luaError = error as? LuaError,
                   case .typeMismatch = luaError else {
                 XCTFail("Expected type mismatch error")
@@ -258,7 +258,7 @@ final class LuaStateTests: XCTestCase {
     }
 
     func testExecuteReturningNoReturnValue() {
-        XCTAssertThrowsError(try lua.executeReturning("print('no return')", as: Int.self)) { error in
+        XCTAssertThrowsError(try lua.execute("print('no return')", returning: Int.self)) { error in
             guard let luaError = error as? LuaError,
                   case .typeMismatch = luaError else {
                 XCTFail("Expected type mismatch error")
@@ -269,10 +269,10 @@ final class LuaStateTests: XCTestCase {
 
     func testExecuteReturningWithPrintOutput() {
         _ = try? lua.execute("print('Previous output')")
-        let result = try? lua.executeReturning("""
+        let result = try? lua.execute("""
             print('Computing result...')
             return 123
-        """, as: Int.self)
+        """, returning: Int.self)
 
         XCTAssertEqual(result, 123)
 
@@ -284,10 +284,15 @@ final class LuaStateTests: XCTestCase {
 
     // MARK: - Register Type Tests
 
-    func testRegisterBridgeableType() {
-        // Use an actual LuaBridgeable type from the framework
-        // Skip this test since we can't easily create a conforming type in tests
-        XCTSkip("Cannot easily create LuaBridgeable conforming type in tests")
+    func testRegisterBridgeableType() throws {
+        TestGlobalsBridgeable.register(in: lua, as: "TestBridgeable")
+
+        let result = try lua.execute("""
+            local object = TestBridgeable()
+            return type(object)
+        """, returning: String.self)
+
+        XCTAssertEqual(result, "userdata")
     }
 
     // MARK: - Private Method Coverage

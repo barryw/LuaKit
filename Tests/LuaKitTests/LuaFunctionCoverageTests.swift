@@ -375,20 +375,6 @@ final class LuaFunctionCoverageTests: XCTestCase {
         lua_pop(lua.luaState, 2) // Pop metatable and function table
     }
 
-    // MARK: - Multiple Return Values
-
-    func testFunctionWithTupleReturn() {
-        // LuaFunction doesn't support tuple returns directly
-        // Skip this test
-        XCTSkip("LuaFunction doesn't support tuple returns")
-    }
-
-    func testFunctionWithTripleReturn() {
-        // LuaFunction doesn't support tuple returns directly
-        // Skip this test
-        XCTSkip("LuaFunction doesn't support tuple returns")
-    }
-
     // MARK: - Edge Cases
 
     func testFunctionWithEmptyStringReturn() {
